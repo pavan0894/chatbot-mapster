@@ -13,7 +13,7 @@ interface ChatbotProps {
 export interface LocationQuery {
   type: 'location_search';
   source: 'fedex' | 'property' | 'starbucks';
-  target?: 'fedex' | 'property' | 'starbucks'; // Add target property as optional
+  target?: 'fedex' | 'property' | 'starbucks';
   radius: number;
   targetLocation?: [number, number]; // [longitude, latitude]
 }
@@ -127,7 +127,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       
       // Determine if Starbucks is the source or target based on query structure
       let source: 'starbucks' | 'fedex' | 'property' = 'starbucks';
-      let target: 'property' | 'fedex' | undefined = 'property';
+      let target: 'starbucks' | 'fedex' | 'property' | undefined = 'property';
       
       if (lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
