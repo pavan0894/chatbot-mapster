@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
 import { cn } from '@/lib/utils';
-import { getAIResponse, ChatMessageData } from '@/services/openaiService';
+import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import { toast } from 'sonner';
 import { calculateDistance } from '@/utils/mapUtils';
 
@@ -34,6 +34,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   const [messages, setMessages] = useState<MessageType[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +49,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     // Focus the input on component mount
     inputRef.current?.focus();
+    
+    // Generate initial suggested questions
+    setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
   }, []);
 
   // Function to check if message is asking about properties near FedEx
@@ -117,28 +121,31 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     setMessages(prev => [...prev, botMessage]);
     setIsLoading(false);
+    
+    // Generate new suggested questions after processing
+    setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputValue.trim() || isLoading) return;
-    
-    // Add user message
+  const handleSuggestedQuestionClick = (question: string) => {
+    // Add the clicked question as a user message
     const userMessage: MessageType = {
       id: Date.now().toString(),
-      text: inputValue,
+      text: question,
       sender: 'user',
       timestamp: new Date(),
     };
     
     setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
     setIsLoading(true);
     
+    // Process the question
+    processMessage(question);
+  };
+
+  const processMessage = async (message: string) => {
     try {
       // Check if this is a location query
-      const locationQuery = isLocationQuery(inputValue);
+      const locationQuery = isLocationQuery(message);
       
       if (locationQuery) {
         // Handle location query immediately
@@ -152,7 +159,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           }))
           .concat({
             role: 'user' as const,
-            content: inputValue
+            content: message
           });
         
         // Get response from AI service
@@ -174,12 +181,36 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         
         setMessages(prev => [...prev, botMessage]);
         setIsLoading(false);
+        
+        // Generate new suggested questions
+        setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
       }
     } catch (error) {
       console.error("Error in chat:", error);
       toast.error("Something went wrong. Please try again.");
       setIsLoading(false);
     }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!inputValue.trim() || isLoading) return;
+    
+    // Add user message
+    const userMessage: MessageType = {
+      id: Date.now().toString(),
+      text: inputValue,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
+    setIsLoading(true);
+    
+    // Process the message
+    await processMessage(inputValue);
   };
 
   return (
@@ -205,6 +236,24 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         )}
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* Suggested Questions */}
+      {!isLoading && suggestedQuestions.length > 0 && (
+        <div className="px-3 py-2 border-t border-border bg-muted/30">
+          <p className="text-xs text-muted-foreground mb-2">Suggested questions:</p>
+          <div className="flex flex-wrap gap-2">
+            {suggestedQuestions.map((question, index) => (
+              <button
+                key={index}
+                onClick={() => handleSuggestedQuestionClick(question)}
+                className="text-xs bg-background/50 hover:bg-background border border-border rounded-full px-3 py-1 text-foreground/70 hover:text-foreground transition-colors"
+              >
+                {question.length > 60 ? `${question.substring(0, 57)}...` : question}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       
       <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-background/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
