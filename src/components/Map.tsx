@@ -26,8 +26,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/light-v11',
         projection: 'globe',
-        zoom: 1.5,
-        center: [30, 15],
+        zoom: 9, // Higher zoom to focus on Dallas area
+        center: [-96.7970, 32.7767], // Dallas, TX coordinates
         pitch: 45,
       });
 
