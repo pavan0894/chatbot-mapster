@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -12,16 +13,14 @@ interface MapProps {
 const Map: React.FC<MapProps> = ({ className = '' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState<string>(DEFAULT_MAPBOX_TOKEN);
-  const [tokenInput, setTokenInput] = useState<string>('');
   const [mapInitialized, setMapInitialized] = useState<boolean>(false);
 
   const initializeMap = () => {
-    if (!mapContainer.current || !mapboxToken || mapInitialized) return;
+    if (!mapContainer.current || mapInitialized) return;
 
     try {
       // Initialize map
-      mapboxgl.accessToken = mapboxToken;
+      mapboxgl.accessToken = DEFAULT_MAPBOX_TOKEN;
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
@@ -109,51 +108,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   };
 
   useEffect(() => {
-    if (mapboxToken) {
-      initializeMap();
-    }
+    initializeMap();
     
     // Cleanup
     return () => {
       map.current?.remove();
     };
-  }, [mapboxToken]);
-
-  const handleSubmitToken = (e: React.FormEvent) => {
-    e.preventDefault();
-    setMapboxToken(tokenInput);
-  };
-
-  if (!mapboxToken) {
-    return (
-      <div className={`flex flex-col items-center justify-center p-8 rounded-3xl bg-secondary/50 ${className}`}>
-        <div className="text-center max-w-md mx-auto">
-          <h3 className="text-lg font-medium mb-4">Mapbox API Token Required</h3>
-          <p className="text-sm text-muted-foreground mb-6">
-            Please enter your Mapbox public token to enable the map. You can find this in your Mapbox account dashboard.
-          </p>
-          <form onSubmit={handleSubmitToken} className="space-y-4">
-            <input
-              type="text"
-              value={tokenInput}
-              onChange={(e) => setTokenInput(e.target.value)}
-              placeholder="Enter Mapbox public token"
-              className="w-full px-4 py-2 rounded-lg border border-input bg-background"
-            />
-            <button
-              type="submit"
-              className="w-full py-2 px-4 bg-primary text-white rounded-lg transition-colors hover:bg-primary/90"
-            >
-              Initialize Map
-            </button>
-          </form>
-          <p className="text-xs text-muted-foreground mt-4">
-            Get your token at <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">mapbox.com</a>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  }, []);
 
   return (
     <div className={`relative h-full ${className}`}>
