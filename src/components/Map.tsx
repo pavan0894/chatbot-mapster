@@ -1,7 +1,7 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { Package } from 'lucide-react';
 
 // Using the provided Mapbox token
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
@@ -28,6 +28,30 @@ const INDUSTRIAL_PROPERTIES = [
   { name: "Arlington Commerce Park", coordinates: [-97.0537, 32.7361], description: "Distribution center" },
   { name: "Farmers Branch Industrial", coordinates: [-96.8891, 32.9367], description: "Light manufacturing" },
   { name: "Addison Technology Park", coordinates: [-96.8315, 32.9721], description: "Electronics production" }
+];
+
+// FedEx locations around Dallas
+const FEDEX_LOCATIONS = [
+  { name: "FedEx Ship Center - Downtown", coordinates: [-96.8066, 32.7791], description: "Shipping & pickup services" },
+  { name: "FedEx Office - Uptown", coordinates: [-96.8031, 32.7956], description: "Printing & shipping services" },
+  { name: "FedEx Ground - North Dallas", coordinates: [-96.7351, 32.9119], description: "Package delivery hub" },
+  { name: "FedEx Express - Addison", coordinates: [-96.8387, 32.9534], description: "Express shipping center" },
+  { name: "FedEx Freight - South Dallas", coordinates: [-96.7865, 32.6953], description: "Freight shipping terminal" },
+  { name: "FedEx Office - Richardson", coordinates: [-96.7519, 32.9312], description: "Business services" },
+  { name: "FedEx Ship Center - Irving", coordinates: [-96.9513, 32.8379], description: "Shipping & pickup services" },
+  { name: "FedEx Ground - Garland", coordinates: [-96.6513, 32.9018], description: "Package sorting facility" },
+  { name: "FedEx Office - Plano", coordinates: [-96.7716, 33.0176], description: "Printing & shipping services" },
+  { name: "FedEx Express - Mesquite", coordinates: [-96.6102, 32.7651], description: "Express shipping center" },
+  { name: "FedEx Ship Center - Lewisville", coordinates: [-96.9945, 33.0317], description: "Shipping & pickup services" },
+  { name: "FedEx Freight - Arlington", coordinates: [-97.0678, 32.7231], description: "Freight shipping terminal" },
+  { name: "FedEx Office - Las Colinas", coordinates: [-96.9419, 32.8632], description: "Business services" },
+  { name: "FedEx Ground - Carrollton", coordinates: [-96.9001, 32.9846], description: "Package delivery hub" },
+  { name: "FedEx Express - Grand Prairie", coordinates: [-97.0213, 32.7596], description: "Express shipping center" },
+  { name: "FedEx Office - Frisco", coordinates: [-96.8239, 33.0945], description: "Printing & shipping services" },
+  { name: "FedEx Ship Center - McKinney", coordinates: [-96.6392, 33.1971], description: "Shipping & pickup services" },
+  { name: "FedEx Office - Grapevine", coordinates: [-97.0789, 32.9342], description: "Business services" },
+  { name: "FedEx Ground - Denton", coordinates: [-97.1306, 33.2148], description: "Package sorting facility" },
+  { name: "FedEx Express - Rockwall", coordinates: [-96.4597, 32.9290], description: "Express shipping center" }
 ];
 
 interface MapProps {
@@ -74,8 +98,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           'horizon-blend': 0.2,
         });
 
-        // Add industrial properties as markers after the map style has loaded
+        // Add industrial properties and FedEx locations as markers after the map style has loaded
         addIndustrialProperties();
+        addFedExLocations();
       });
 
       // Rotation animation settings
@@ -160,6 +185,52 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       // Add marker to map
       new mapboxgl.Marker(el)
         .setLngLat(property.coordinates as [number, number])
+        .setPopup(popup)
+        .addTo(map.current);
+    });
+  };
+
+  // Function to add FedEx location markers to the map
+  const addFedExLocations = () => {
+    if (!map.current) return;
+
+    FEDEX_LOCATIONS.forEach(location => {
+      // Create a custom marker element
+      const el = document.createElement('div');
+      el.className = 'fedex-marker';
+      el.style.width = '28px';
+      el.style.height = '28px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#4D148C'; // FedEx purple
+      el.style.border = '2px solid #FF6600'; // FedEx orange
+      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      el.style.cursor = 'pointer';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+
+      // Add FedEx logo/icon
+      const icon = document.createElement('div');
+      icon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 8.5L12 14L5 8.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      `;
+      el.appendChild(icon);
+
+      // Create popup for the marker
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div style="padding: 5px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px; color: #4D148C;">${location.name}</h3>
+            <p style="margin: 0;">${location.description}</p>
+          </div>
+        `);
+
+      // Add marker to map
+      new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
         .addTo(map.current);
     });
