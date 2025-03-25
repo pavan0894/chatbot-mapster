@@ -97,6 +97,28 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     return null;
   };
 
+  // Function to handle location queries immediately
+  const handleLocationQuery = (locationQuery: LocationQuery) => {
+    // Dispatch custom event for map component to listen to
+    const locationEvent = new CustomEvent(LOCATION_QUERY_EVENT, { 
+      detail: locationQuery 
+    });
+    window.dispatchEvent(locationEvent);
+    
+    // Add bot response for location query
+    const responseText = `Showing ${locationQuery.source === 'fedex' ? 'properties' : 'FedEx locations'} within ${locationQuery.radius} miles of ${locationQuery.source === 'fedex' ? 'FedEx locations' : 'industrial properties'} on the map.`;
+    
+    const botMessage: MessageType = {
+      id: Date.now().toString(),
+      text: responseText,
+      sender: 'bot',
+      timestamp: new Date(),
+    };
+    
+    setMessages(prev => [...prev, botMessage]);
+    setIsLoading(false);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -119,23 +141,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       const locationQuery = isLocationQuery(inputValue);
       
       if (locationQuery) {
-        // Dispatch custom event for map component to listen to
-        const locationEvent = new CustomEvent(LOCATION_QUERY_EVENT, { 
-          detail: locationQuery 
-        });
-        window.dispatchEvent(locationEvent);
-        
-        // Add bot response for location query
-        const responseText = `Showing ${locationQuery.source === 'fedex' ? 'properties' : 'FedEx locations'} within ${locationQuery.radius} miles of ${locationQuery.source === 'fedex' ? 'FedEx locations' : 'industrial properties'} on the map.`;
-        
-        const botMessage: MessageType = {
-          id: Date.now().toString(),
-          text: responseText,
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        
-        setMessages(prev => [...prev, botMessage]);
+        // Handle location query immediately
+        handleLocationQuery(locationQuery);
       } else {
         // Convert our messages to the format expected by OpenAI, ensuring correct type for 'role'
         const aiMessages: ChatMessageData[] = messages
@@ -153,6 +160,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         
         if (response.error) {
           toast.error(response.error);
+          setIsLoading(false);
           return;
         }
         
@@ -165,11 +173,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         };
         
         setMessages(prev => [...prev, botMessage]);
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error in chat:", error);
       toast.error("Something went wrong. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };

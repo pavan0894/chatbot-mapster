@@ -30,7 +30,7 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
     
     console.log("Sending to AI:", messages);
     
-    // Simulate API call with timeout
+    // Simulate API call with shorter timeout for a more responsive feel
     return new Promise((resolve) => {
       setTimeout(() => {
         // This is where you would actually call the OpenAI API
@@ -56,7 +56,7 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
         }
         
         resolve({ text: responseText });
-      }, 1000); // Simulate network delay
+      }, 500); // Reduced delay for more responsive feel
     });
   } catch (error) {
     console.error("Error getting AI response:", error);
