@@ -75,6 +75,30 @@ const FEDEX_LOCATIONS: LocationWithCoordinates[] = [
   { name: "FedEx Express - Rockwall", coordinates: [-96.4597, 32.9290], description: "Express shipping center" }
 ];
 
+// Starbucks locations around Dallas
+const STARBUCKS_LOCATIONS: LocationWithCoordinates[] = [
+  { name: "Starbucks - Downtown", coordinates: [-96.8033, 32.7831], description: "24/7 coffee shop" },
+  { name: "Starbucks - Uptown", coordinates: [-96.8011, 32.7994], description: "Cozy location with patio" },
+  { name: "Starbucks Reserve - Victory Park", coordinates: [-96.8123, 32.7872], description: "Premium coffee experience" },
+  { name: "Starbucks - North Park", coordinates: [-96.7711, 32.8688], description: "Located in shopping center" },
+  { name: "Starbucks - Deep Ellum", coordinates: [-96.7831, 32.7852], description: "Urban design with local art" },
+  { name: "Starbucks - Bishop Arts", coordinates: [-96.8291, 32.7502], description: "Neighborhood cafe" },
+  { name: "Starbucks - Mockingbird Station", coordinates: [-96.7722, 32.8371], description: "Transit-oriented location" },
+  { name: "Starbucks - SMU Campus", coordinates: [-96.7821, 32.8412], description: "University cafe" },
+  { name: "Starbucks - Lakewood", coordinates: [-96.7522, 32.8132], description: "Community gathering spot" },
+  { name: "Starbucks - Knox Henderson", coordinates: [-96.7891, 32.8212], description: "Bustling corner location" },
+  { name: "Starbucks - West Village", coordinates: [-96.8021, 32.8032], description: "Mixed-use development cafe" },
+  { name: "Starbucks - Design District", coordinates: [-96.8212, 32.7954], description: "Modern industrial design" },
+  { name: "Starbucks - Lower Greenville", coordinates: [-96.7701, 32.8132], description: "Trendy neighborhood spot" },
+  { name: "Starbucks - Casa Linda", coordinates: [-96.7182, 32.8341], description: "Family-friendly location" },
+  { name: "Starbucks - Galleria Dallas", coordinates: [-96.8139, 32.9291], description: "Shopping mall cafe" },
+  { name: "Starbucks - Highland Park", coordinates: [-96.8011, 32.8312], description: "Upscale neighborhood cafe" },
+  { name: "Starbucks Drive-Thru - Love Field", coordinates: [-96.8512, 32.8491], description: "Convenient airport location" },
+  { name: "Starbucks - Preston Center", coordinates: [-96.8041, 32.8691], description: "Business district cafe" },
+  { name: "Starbucks - Oak Lawn", coordinates: [-96.8111, 32.8112], description: "Corner cafe with outdoor seating" },
+  { name: "Starbucks - Cityplace", coordinates: [-96.7922, 32.7991], description: "Urban tower location" }
+];
+
 interface MapProps {
   className?: string;
 }
@@ -130,6 +154,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         // Add industrial properties and FedEx locations as markers
         addIndustrialProperties();
         addFedExLocations();
+        addStarbucksLocations(); // Add Starbucks locations
         
         setMapInitialized(true);
       });
@@ -287,6 +312,64 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     setActiveMarkers(prev => [...prev, ...markers]);
   };
 
+  // Function to add Starbucks location markers to the map
+  const addStarbucksLocations = () => {
+    if (!map.current) {
+      console.error("Map not initialized when adding Starbucks locations");
+      return;
+    }
+    
+    console.log("Adding Starbucks locations markers");
+    const markers: mapboxgl.Marker[] = [];
+    
+    STARBUCKS_LOCATIONS.forEach(location => {
+      // Create a custom marker element
+      const el = document.createElement('div');
+      el.className = 'starbucks-marker';
+      el.style.width = '28px';
+      el.style.height = '28px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#006241'; // Starbucks green
+      el.style.border = '2px solid #fff';
+      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      el.style.cursor = 'pointer';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      
+      // Add Starbucks logo/icon
+      const icon = document.createElement('div');
+      icon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 4C9.5 4 7.5 6.5 7.5 9.5C7.5 12.5 9 13.5 12 13.5C15 13.5 16.5 12.5 16.5 9.5C16.5 6.5 14.5 4 12 4Z" fill="white"/>
+          <path d="M20 12C19.5 15.5 16 18 12 18C8 18 4.5 15.5 4 12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/>
+        </svg>
+      `;
+      el.appendChild(icon);
+      
+      // Create popup for the marker
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div style="padding: 5px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px; color: #006241;">${location.name}</h3>
+            <p style="margin: 0;">${location.description}</p>
+          </div>
+        `);
+      
+      // Add marker to map
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates as [number, number])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markers.push(marker);
+    });
+    
+    // Save the markers reference
+    setActiveMarkers(prev => [...prev, ...markers]);
+  };
+
   // Function to handle location queries
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
     const query = event.detail;
@@ -304,8 +387,19 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearAllMarkers();
     
     // Find locations within the radius
-    const sourceData = query.source === 'fedex' ? FEDEX_LOCATIONS : INDUSTRIAL_PROPERTIES;
-    const targetData = query.source === 'fedex' ? INDUSTRIAL_PROPERTIES : FEDEX_LOCATIONS;
+    let sourceData;
+    let targetData;
+    
+    if (query.source === 'fedex') {
+      sourceData = FEDEX_LOCATIONS;
+      targetData = query.target === 'starbucks' ? STARBUCKS_LOCATIONS : INDUSTRIAL_PROPERTIES;
+    } else if (query.source === 'starbucks') {
+      sourceData = STARBUCKS_LOCATIONS;
+      targetData = query.target === 'fedex' ? FEDEX_LOCATIONS : INDUSTRIAL_PROPERTIES;
+    } else {
+      sourceData = INDUSTRIAL_PROPERTIES;
+      targetData = query.target === 'starbucks' ? STARBUCKS_LOCATIONS : FEDEX_LOCATIONS;
+    }
     
     const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
       sourceData,
@@ -321,14 +415,26 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       // Add all markers back since there are no filtered results
       addIndustrialProperties();
       addFedExLocations();
+      addStarbucksLocations();
       return;
     }
     
     // Add filtered source locations
-    addFilteredLocations(sourceLocations, query.source, '#4D148C', '#FF6600');
+    addFilteredLocations(sourceLocations, query.source, 
+      query.source === 'fedex' ? '#4D148C' : 
+      query.source === 'starbucks' ? '#006241' : '#333', 
+      query.source === 'fedex' ? '#FF6600' : 
+      query.source === 'starbucks' ? '#fff' : '#fff');
     
     // Add filtered target locations
-    addFilteredLocations(targetLocations, query.source === 'fedex' ? 'property' : 'fedex', '#333', '#fff');
+    const targetType = query.target || (query.source === 'fedex' ? 'property' : 
+                                       query.source === 'starbucks' ? 'property' : 'fedex');
+    
+    addFilteredLocations(targetLocations, targetType, 
+      targetType === 'fedex' ? '#4D148C' : 
+      targetType === 'starbucks' ? '#006241' : '#333', 
+      targetType === 'fedex' ? '#FF6600' : 
+      targetType === 'starbucks' ? '#fff' : '#fff');
     
     // Add connection lines between locations
     addConnectionLines(connections);
@@ -346,7 +452,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   // Add filtered locations to the map
   const addFilteredLocations = (
     locations: LocationWithCoordinates[],
-    locationType: 'fedex' | 'property',
+    locationType: 'fedex' | 'property' | 'starbucks',
     bgColor: string,
     borderColor: string
   ) => {
@@ -385,6 +491,30 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           </svg>
         `;
         el.appendChild(icon);
+      } else if (locationType === 'starbucks') {
+        // Starbucks marker style
+        el.style.width = '28px';
+        el.style.height = '28px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = bgColor;
+        el.style.border = `2px solid ${borderColor}`;
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '10';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        
+        // Add Starbucks logo/icon
+        const icon = document.createElement('div');
+        icon.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 4C9.5 4 7.5 6.5 7.5 9.5C7.5 12.5 9 13.5 12 13.5C15 13.5 16.5 12.5 16.5 9.5C16.5 6.5 14.5 4 12 4Z" fill="white"/>
+            <path d="M20 12C19.5 15.5 16 18 12 18C8 18 4.5 15.5 4 12" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/>
+          </svg>
+        `;
+        el.appendChild(icon);
       } else {
         // Google-style pin for properties
         el.style.width = '24px';
@@ -399,13 +529,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       // Create popup for the marker
-      const popup = new mapboxgl.Popup({ offset: locationType === 'fedex' ? 25 : [0, -25] })
-        .setHTML(`
-          <div style="padding: 5px;">
-            <h3 style="font-weight: bold; margin-bottom: 5px; ${locationType === 'fedex' ? 'color: #4D148C;' : ''}">${location.name}</h3>
-            <p style="margin: 0;">${location.description}</p>
-          </div>
-        `);
+      const popup = new mapboxgl.Popup({ 
+        offset: locationType === 'property' ? [0, -25] : 25 
+      }).setHTML(`
+        <div style="padding: 5px;">
+          <h3 style="font-weight: bold; margin-bottom: 5px; ${
+            locationType === 'fedex' ? 'color: #4D148C;' : 
+            locationType === 'starbucks' ? 'color: #006241;' : ''
+          }">${location.name}</h3>
+          <p style="margin: 0;">${location.description}</p>
+        </div>
+      `);
       
       // Ensure coordinates is a valid [number, number] tuple
       const coordinates = Array.isArray(location.coordinates) && location.coordinates.length >= 2 
@@ -570,6 +704,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     // Re-add all markers
     addIndustrialProperties();
     addFedExLocations();
+    addStarbucksLocations();
   };
 
   // Listen for location query events
