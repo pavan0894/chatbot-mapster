@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
@@ -9,10 +10,13 @@ interface ChatbotProps {
   className?: string;
 }
 
+// Define a union type for location sources/targets to avoid comparison errors
+type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
+
 export interface LocationQuery {
   type: 'location_search';
-  source: 'fedex' | 'property' | 'starbucks';
-  target?: 'fedex' | 'property' | 'starbucks';
+  source: LocationSourceTarget;
+  target?: LocationSourceTarget;
   radius: number;
   targetLocation?: [number, number]; // [longitude, latitude]
 }
@@ -125,8 +129,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       }
       
       // Determine if Starbucks is the source or target based on query structure
-      let source: 'starbucks' | 'fedex' | 'property' = 'starbucks';
-      let target: 'starbucks' | 'fedex' | 'property' | undefined = 'property';
+      let source: LocationSourceTarget = 'starbucks';
+      let target: LocationSourceTarget | undefined = 'property';
       
       if (lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
@@ -168,8 +172,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       }
       
       // Determine source and target based on word order
-      let source: 'starbucks' | 'fedex' | 'property';
-      let target: 'starbucks' | 'fedex' | 'property';
+      let source: LocationSourceTarget;
+      let target: LocationSourceTarget;
       
       if (lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('fedex') < lowerMsg.indexOf('starbucks')) {
@@ -209,8 +213,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       }
       
       // Determine source and target based on query
-      let source: 'fedex' | 'property' | 'starbucks' = 'property';
-      let target: 'fedex' | 'property' | 'starbucks' | undefined;
+      let source: LocationSourceTarget = 'property';
+      let target: LocationSourceTarget | undefined;
       
       if (lowerMsg.includes('starbucks') && lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
