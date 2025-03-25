@@ -1,8 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SendIcon } from 'lucide-react';
+import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
 import { cn } from '@/lib/utils';
+import { getAIResponse, ChatMessageData } from '@/services/openaiService';
+import { toast } from 'sonner';
 
 interface ChatbotProps {
   className?: string;
@@ -20,6 +22,7 @@ const initialMessages: MessageType[] = [
 const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   const [messages, setMessages] = useState<MessageType[]>(initialMessages);
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -36,10 +39,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isLoading) return;
     
     // Add user message
     const userMessage: MessageType = {
@@ -51,32 +54,42 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
+    setIsLoading(true);
     
-    // Simulate bot response after a delay
-    setTimeout(() => {
+    try {
+      // Convert our messages to the format expected by OpenAI
+      const aiMessages: ChatMessageData[] = messages
+        .map(msg => ({
+          role: msg.sender === 'bot' ? 'assistant' : 'user',
+          content: msg.text
+        }))
+        .concat({
+          role: 'user',
+          content: inputValue
+        });
+      
+      // Get response from AI service
+      const response = await getAIResponse(aiMessages);
+      
+      if (response.error) {
+        toast.error(response.error);
+        return;
+      }
+      
+      // Add bot response
       const botMessage: MessageType = {
-        id: (Date.now() + 1).toString(),
-        text: getBotResponse(inputValue),
+        id: Date.now().toString(),
+        text: response.text,
         sender: 'bot',
         timestamp: new Date(),
       };
+      
       setMessages(prev => [...prev, botMessage]);
-    }, 1000);
-  };
-
-  const getBotResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
-    
-    if (input.includes('hello') || input.includes('hi')) {
-      return "Hello there! How can I help you with the map today?";
-    } else if (input.includes('direction') || input.includes('how to get')) {
-      return "To get directions, you can click on any location on the map and select 'Directions'. Where would you like to go?";
-    } else if (input.includes('zoom')) {
-      return "You can zoom in and out using the mouse wheel, pinch gesture, or the controls in the top-right corner of the map.";
-    } else if (input.includes('where is') || input.includes('find')) {
-      return "I can help you find places on the map. Could you specify the name of the location you're looking for?";
-    } else {
-      return "I'm not sure I understand. Could you rephrase your question about the map or location you're interested in?";
+    } catch (error) {
+      console.error("Error in chat:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,6 +103,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         {messages.map(message => (
           <ChatMessage key={message.id} message={message} />
         ))}
+        {isLoading && (
+          <div className="flex items-center space-x-2 animate-fade-in">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-medium text-primary">AI</span>
+            </div>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              <span>Thinking...</span>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
       
@@ -102,13 +126,21 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Type your message..."
             className="flex-1 bg-transparent py-2 px-3 rounded-full border border-border focus:border-primary/30 focus:ring-0 outline-none transition-colors text-sm"
+            disabled={isLoading}
           />
           <button
             type="submit"
-            className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary/90 focus:bg-primary/90 transition-colors"
-            disabled={!inputValue.trim()}
+            className={cn(
+              "w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center transition-colors",
+              (isLoading || !inputValue.trim()) ? "opacity-50 cursor-not-allowed" : "hover:bg-primary/90 focus:bg-primary/90"
+            )}
+            disabled={isLoading || !inputValue.trim()}
           >
-            <SendIcon size={18} />
+            {isLoading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <SendIcon size={18} />
+            )}
           </button>
         </div>
       </form>
