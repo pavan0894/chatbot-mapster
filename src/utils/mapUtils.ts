@@ -103,3 +103,18 @@ export function findLocationsWithinRadius(
     connections
   };
 }
+
+// Fix for the "There is already a source with ID 'connections'" error
+export function checkAndRemoveLayers(map: mapboxgl.Map, layerIds: string[], sourceId: string): void {
+  // Remove any existing layers
+  layerIds.forEach(layerId => {
+    if (map.getLayer(layerId)) {
+      map.removeLayer(layerId);
+    }
+  });
+  
+  // Remove the source if it exists
+  if (map.getSource(sourceId)) {
+    map.removeSource(sourceId);
+  }
+}

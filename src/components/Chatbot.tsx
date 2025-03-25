@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
@@ -124,15 +125,31 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine target based on query
-      let target: 'property' | 'fedex' = 'property';
+      // Determine if Starbucks is the source or target based on query structure
+      let source: 'starbucks' | 'fedex' | 'property' = 'starbucks';
+      let target: 'property' | 'fedex' | undefined = 'property';
+      
       if (lowerMsg.includes('fedex')) {
-        target = 'fedex';
+        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
+          source = 'starbucks';
+          target = 'fedex';
+        } else {
+          source = 'fedex';
+          target = 'starbucks';
+        }
+      } else if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
+        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
+          source = 'starbucks';
+          target = 'property';
+        } else {
+          source = 'property';
+          target = 'starbucks';
+        }
       }
       
       return {
         type: 'location_search',
-        source: 'starbucks',
+        source,
         target,
         radius
       };
@@ -151,13 +168,32 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine source based on what comes first in the query
-      const source = lowerMsg.includes('fedex') ? 'fedex' : 'property';
+      // Determine source and target based on word order
+      let source: 'starbucks' | 'fedex' | 'property';
+      let target: 'starbucks' | 'fedex' | 'property';
+      
+      if (lowerMsg.includes('fedex')) {
+        if (lowerMsg.indexOf('fedex') < lowerMsg.indexOf('starbucks')) {
+          source = 'fedex';
+          target = 'starbucks';
+        } else {
+          source = 'starbucks';
+          target = 'fedex';
+        }
+      } else {
+        if (lowerMsg.indexOf('propert') < lowerMsg.indexOf('starbucks')) {
+          source = 'property';
+          target = 'starbucks';
+        } else {
+          source = 'starbucks';
+          target = 'property';
+        }
+      }
       
       return {
         type: 'location_search',
         source,
-        target: 'starbucks',
+        target,
         radius
       };
     }
@@ -210,6 +246,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       };
     }
     
+    // Direct Starbucks query for showing all Starbucks locations
+    if (lowerMsg.includes('starbucks') && 
+        (lowerMsg.includes('show') || lowerMsg.includes('display') || lowerMsg.includes('where') || 
+         lowerMsg.includes('find') || lowerMsg.includes('locate') || lowerMsg.includes('search'))) {
+      return {
+        type: 'location_search',
+        source: 'starbucks',
+        radius: 10 // Larger default radius for general searches
+      };
+    }
+    
     return null;
   };
 
@@ -232,7 +279,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
                      locationQuery.source === 'starbucks' ? 'Starbucks locations' : 
                      'industrial properties'} on the map.`;
     } else {
-      responseText = `Showing locations within ${locationQuery.radius} miles on the map.`;
+      if (locationQuery.source === 'starbucks') {
+        responseText = `Showing all Starbucks locations on the map.`;
+      } else {
+        responseText = `Showing ${locationQuery.source === 'fedex' ? 'FedEx locations' : 
+                       locationQuery.source === 'starbucks' ? 'Starbucks locations' : 
+                       'industrial properties'} within ${locationQuery.radius} miles on the map.`;
+      }
     }
     
     const botMessage: MessageType = {

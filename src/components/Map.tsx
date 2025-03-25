@@ -407,6 +407,26 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         : (query.target === 'fedex' ? FEDEX_LOCATIONS : FEDEX_LOCATIONS);
     }
     
+    // If it's a simple query without a target (e.g., "show starbucks"), just add those markers
+    if (!query.target) {
+      if (query.source === 'starbucks') {
+        addStarbucksLocations();
+        // Fit the map to show all Starbucks locations
+        fitMapToLocations(STARBUCKS_LOCATIONS.map(loc => loc.coordinates as [number, number]));
+        return;
+      } else if (query.source === 'fedex') {
+        addFedExLocations();
+        // Fit the map to show all FedEx locations
+        fitMapToLocations(FEDEX_LOCATIONS.map(loc => loc.coordinates as [number, number]));
+        return;
+      } else if (query.source === 'property') {
+        addIndustrialProperties();
+        // Fit the map to show all properties
+        fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+        return;
+      }
+    }
+    
     const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
       sourceData,
       targetData,
@@ -433,15 +453,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       query.source === 'starbucks' ? '#fff' : '#fff');
     
     // Add filtered target locations
-    const targetType = query.target || 
-      (query.source === 'fedex' ? 'property' : 
-      (query.source === 'starbucks' ? 'property' : 'fedex'));
-    
-    addFilteredLocations(targetLocations, targetType as 'fedex' | 'property' | 'starbucks', 
-      targetType === 'fedex' ? '#4D148C' : 
-      targetType === 'starbucks' ? '#006241' : '#333', 
-      targetType === 'fedex' ? '#FF6600' : 
-      targetType === 'starbucks' ? '#fff' : '#fff');
+    if (query.target) {
+      addFilteredLocations(targetLocations, query.target, 
+        query.target === 'fedex' ? '#4D148C' : 
+        query.target === 'starbucks' ? '#006241' : '#333', 
+        query.target === 'fedex' ? '#FF6600' : 
+        query.target === 'starbucks' ? '#fff' : '#fff');
+    }
     
     // Add connection lines between locations
     addConnectionLines(connections);
