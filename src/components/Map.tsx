@@ -200,19 +200,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const markers: mapboxgl.Marker[] = [];
     
     INDUSTRIAL_PROPERTIES.forEach(property => {
-      // Create a custom marker element
+      // Create a custom Google-style map pin element
       const el = document.createElement('div');
       el.className = 'industrial-marker';
-      el.style.width = '20px';
-      el.style.height = '20px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = '#333';
-      el.style.border = '2px solid #fff';
-      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      el.style.width = '24px';
+      el.style.height = '34px';
+      el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
+      el.style.backgroundSize = 'contain';
+      el.style.backgroundRepeat = 'no-repeat';
       el.style.cursor = 'pointer';
       
       // Create popup for the marker
-      const popup = new mapboxgl.Popup({ offset: 25 })
+      const popup = new mapboxgl.Popup({ offset: [0, -25] })
         .setHTML(`
           <h3 style="font-weight: bold; margin-bottom: 5px;">${property.name}</h3>
           <p style="margin: 0;">${property.description}</p>
@@ -362,16 +361,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       // Create a custom marker element
       const el = document.createElement('div');
       el.className = `${locationType}-marker-filtered`;
-      el.style.width = locationType === 'fedex' ? '28px' : '20px';
-      el.style.height = locationType === 'fedex' ? '28px' : '20px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = bgColor;
-      el.style.border = `2px solid ${borderColor}`;
-      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
-      el.style.cursor = 'pointer';
-      el.style.zIndex = '10';
       
       if (locationType === 'fedex') {
+        // Keep existing FedEx marker style
+        el.style.width = '28px';
+        el.style.height = '28px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = bgColor;
+        el.style.border = `2px solid ${borderColor}`;
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '10';
         el.style.display = 'flex';
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
@@ -385,10 +385,21 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           </svg>
         `;
         el.appendChild(icon);
+      } else {
+        // Google-style pin for properties
+        el.style.width = '24px';
+        el.style.height = '34px';
+        el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
+        el.style.backgroundSize = 'contain';
+        el.style.backgroundRepeat = 'no-repeat';
+        el.style.cursor = 'pointer';
+        el.style.zIndex = '10';
+        // Add highlight effect for filtered pins
+        el.style.filter = 'drop-shadow(0 0 6px rgba(255,102,0,0.8))';
       }
       
       // Create popup for the marker
-      const popup = new mapboxgl.Popup({ offset: 25 })
+      const popup = new mapboxgl.Popup({ offset: locationType === 'fedex' ? 25 : [0, -25] })
         .setHTML(`
           <div style="padding: 5px;">
             <h3 style="font-weight: bold; margin-bottom: 5px; ${locationType === 'fedex' ? 'color: #4D148C;' : ''}">${location.name}</h3>
