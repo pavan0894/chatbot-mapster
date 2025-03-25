@@ -5,7 +5,6 @@ import ChatMessage, { MessageType } from './ChatMessage';
 import { cn } from '@/lib/utils';
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import { toast } from 'sonner';
-import { calculateDistance } from '@/utils/mapUtils';
 
 interface ChatbotProps {
   className?: string;
@@ -54,6 +53,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
   }, []);
 
+  // Convert message history to ChatMessageData format for the AI service
+  const getMessageHistory = (): ChatMessageData[] => {
+    return messages.map(msg => ({
+      role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
+      content: msg.text
+    }));
+  };
+
   // Function to check if message is asking about properties near FedEx
   const isLocationQuery = (message: string): LocationQuery | null => {
     const lowerMsg = message.toLowerCase();
@@ -62,7 +69,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     if (
       (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
       lowerMsg.includes('fedex') && 
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius'))
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
       // Extract radius if mentioned
       let radius = 3; // Default radius in miles
@@ -81,8 +88,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     // Check for FedEx locations near properties query
     if (
       lowerMsg.includes('fedex') && 
-      (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius'))
+      (
+        (lowerMsg.includes('properties') || lowerMsg.includes('property')) || 
+        lowerMsg.includes('industrial') || 
+        lowerMsg.includes('warehouse') || 
+        lowerMsg.includes('distribution')
+      ) && 
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
       // Extract radius if mentioned
       let radius = 3; // Default radius in miles
@@ -95,6 +107,27 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         type: 'location_search',
         source: 'property',
         radius: radius
+      };
+    }
+
+    // Simplified location queries with just radius
+    if (
+      (lowerMsg.includes('fedex') || lowerMsg.includes('properties') || lowerMsg.includes('property')) &&
+      (lowerMsg.includes('mile') || lowerMsg.includes('miles') || lowerMsg.includes('radius'))
+    ) {
+      let radius = 3; // Default radius in miles
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi|radius)/);
+      if (radiusMatch) {
+        radius = parseInt(radiusMatch[1]);
+      }
+      
+      // Determine source based on what comes first in the query
+      const source = lowerMsg.indexOf('fedex') < lowerMsg.indexOf('propert') ? 'property' : 'fedex';
+      
+      return {
+        type: 'location_search',
+        source,
+        radius
       };
     }
     
@@ -122,8 +155,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages(prev => [...prev, botMessage]);
     setIsLoading(false);
     
-    // Generate new suggested questions after processing
-    setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
+    // Generate new suggested questions based on updated conversation history
+    const updatedHistory = [
+      ...getMessageHistory(),
+      { role: 'assistant' as const, content: responseText }
+    ];
+    setSuggestedQuestions(generateSuggestedQuestions(updatedHistory).slice(0, 3));
   };
 
   const handleSuggestedQuestionClick = (question: string) => {
@@ -151,12 +188,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         // Handle location query immediately
         handleLocationQuery(locationQuery);
       } else {
-        // Convert our messages to the format expected by OpenAI, ensuring correct type for 'role'
-        const aiMessages: ChatMessageData[] = messages
-          .map(msg => ({
-            role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
-            content: msg.text
-          }))
+        // Convert our messages to the format expected by OpenAI
+        const aiMessages: ChatMessageData[] = getMessageHistory()
           .concat({
             role: 'user' as const,
             content: message
@@ -182,8 +215,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         setMessages(prev => [...prev, botMessage]);
         setIsLoading(false);
         
-        // Generate new suggested questions
-        setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
+        // Generate new suggested questions based on updated conversation history
+        const updatedHistory = [
+          ...aiMessages,
+          { role: 'assistant' as const, content: response.text }
+        ];
+        setSuggestedQuestions(generateSuggestedQuestions(updatedHistory).slice(0, 3));
       }
     } catch (error) {
       console.error("Error in chat:", error);
