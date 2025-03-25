@@ -387,18 +387,24 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearAllMarkers();
     
     // Find locations within the radius
-    let sourceData;
-    let targetData;
+    let sourceData: LocationWithCoordinates[];
+    let targetData: LocationWithCoordinates[];
     
     if (query.source === 'fedex') {
       sourceData = FEDEX_LOCATIONS;
-      targetData = query.target === 'starbucks' ? STARBUCKS_LOCATIONS : INDUSTRIAL_PROPERTIES;
+      targetData = query.target === 'starbucks' 
+        ? STARBUCKS_LOCATIONS 
+        : (query.target === 'property' ? INDUSTRIAL_PROPERTIES : INDUSTRIAL_PROPERTIES);
     } else if (query.source === 'starbucks') {
       sourceData = STARBUCKS_LOCATIONS;
-      targetData = query.target === 'fedex' ? FEDEX_LOCATIONS : INDUSTRIAL_PROPERTIES;
+      targetData = query.target === 'fedex' 
+        ? FEDEX_LOCATIONS 
+        : (query.target === 'property' ? INDUSTRIAL_PROPERTIES : INDUSTRIAL_PROPERTIES);
     } else {
       sourceData = INDUSTRIAL_PROPERTIES;
-      targetData = query.target === 'starbucks' ? STARBUCKS_LOCATIONS : FEDEX_LOCATIONS;
+      targetData = query.target === 'starbucks' 
+        ? STARBUCKS_LOCATIONS 
+        : (query.target === 'fedex' ? FEDEX_LOCATIONS : FEDEX_LOCATIONS);
     }
     
     const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
@@ -427,10 +433,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       query.source === 'starbucks' ? '#fff' : '#fff');
     
     // Add filtered target locations
-    const targetType = query.target || (query.source === 'fedex' ? 'property' : 
-                                       query.source === 'starbucks' ? 'property' : 'fedex');
+    const targetType = query.target || 
+      (query.source === 'fedex' ? 'property' : 
+      (query.source === 'starbucks' ? 'property' : 'fedex'));
     
-    addFilteredLocations(targetLocations, targetType, 
+    addFilteredLocations(targetLocations, targetType as 'fedex' | 'property' | 'starbucks', 
       targetType === 'fedex' ? '#4D148C' : 
       targetType === 'starbucks' ? '#006241' : '#333', 
       targetType === 'fedex' ? '#FF6600' : 

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
@@ -12,7 +11,8 @@ interface ChatbotProps {
 
 export interface LocationQuery {
   type: 'location_search';
-  source: 'fedex' | 'property';
+  source: 'fedex' | 'property' | 'starbucks';
+  target?: 'fedex' | 'property' | 'starbucks'; // Add target property as optional
   radius: number;
   targetLocation?: [number, number]; // [longitude, latitude]
 }
@@ -61,7 +61,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     }));
   };
 
-  // Function to check if message is asking about properties near FedEx
+  // Function to check if message is asking about locations
   const isLocationQuery = (message: string): LocationQuery | null => {
     const lowerMsg = message.toLowerCase();
     
@@ -81,6 +81,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       return {
         type: 'location_search',
         source: 'fedex',
+        target: 'property',
         radius: radius
       };
     }
@@ -106,13 +107,64 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       return {
         type: 'location_search',
         source: 'property',
+        target: 'fedex',
         radius: radius
+      };
+    }
+    
+    // Check for Starbucks related queries
+    if (
+      lowerMsg.includes('starbucks') &&
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
+    ) {
+      // Extract radius if mentioned
+      let radius = 3; // Default radius in miles
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
+      if (radiusMatch) {
+        radius = parseInt(radiusMatch[1]);
+      }
+      
+      // Determine target based on query
+      let target: 'property' | 'fedex' = 'property';
+      if (lowerMsg.includes('fedex')) {
+        target = 'fedex';
+      }
+      
+      return {
+        type: 'location_search',
+        source: 'starbucks',
+        target,
+        radius
+      };
+    }
+    
+    // Check for properties or FedEx near Starbucks
+    if (
+      (lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('fedex')) &&
+      lowerMsg.includes('starbucks') &&
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
+    ) {
+      // Extract radius if mentioned
+      let radius = 3; // Default radius in miles
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
+      if (radiusMatch) {
+        radius = parseInt(radiusMatch[1]);
+      }
+      
+      // Determine source based on what comes first in the query
+      const source = lowerMsg.includes('fedex') ? 'fedex' : 'property';
+      
+      return {
+        type: 'location_search',
+        source,
+        target: 'starbucks',
+        radius
       };
     }
 
     // Simplified location queries with just radius
     if (
-      (lowerMsg.includes('fedex') || lowerMsg.includes('properties') || lowerMsg.includes('property')) &&
+      (lowerMsg.includes('fedex') || lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('starbucks')) &&
       (lowerMsg.includes('mile') || lowerMsg.includes('miles') || lowerMsg.includes('radius'))
     ) {
       let radius = 3; // Default radius in miles
@@ -121,12 +173,39 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine source based on what comes first in the query
-      const source = lowerMsg.indexOf('fedex') < lowerMsg.indexOf('propert') ? 'property' : 'fedex';
+      // Determine source and target based on query
+      let source: 'fedex' | 'property' | 'starbucks' = 'property';
+      let target: 'fedex' | 'property' | 'starbucks' | undefined;
+      
+      if (lowerMsg.includes('starbucks') && lowerMsg.includes('fedex')) {
+        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
+          source = 'starbucks';
+          target = 'fedex';
+        } else {
+          source = 'fedex';
+          target = 'starbucks';
+        }
+      } else if (lowerMsg.includes('starbucks') && (lowerMsg.includes('property') || lowerMsg.includes('properties'))) {
+        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
+          source = 'starbucks';
+          target = 'property';
+        } else {
+          source = 'property';
+          target = 'starbucks';
+        }
+      } else if (lowerMsg.includes('fedex')) {
+        source = 'fedex';
+        if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
+          target = 'property';
+        }
+      } else if (lowerMsg.includes('starbucks')) {
+        source = 'starbucks';
+      }
       
       return {
         type: 'location_search',
         source,
+        target,
         radius
       };
     }
@@ -142,8 +221,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     });
     window.dispatchEvent(locationEvent);
     
-    // Add bot response for location query
-    const responseText = `Showing ${locationQuery.source === 'fedex' ? 'properties' : 'FedEx locations'} within ${locationQuery.radius} miles of ${locationQuery.source === 'fedex' ? 'FedEx locations' : 'industrial properties'} on the map.`;
+    // Generate response text based on query
+    let responseText = '';
+    
+    if (locationQuery.target) {
+      responseText = `Showing ${locationQuery.target === 'fedex' ? 'FedEx locations' : 
+                     locationQuery.target === 'starbucks' ? 'Starbucks locations' : 
+                     'industrial properties'} within ${locationQuery.radius} miles of ${
+                     locationQuery.source === 'fedex' ? 'FedEx locations' : 
+                     locationQuery.source === 'starbucks' ? 'Starbucks locations' : 
+                     'industrial properties'} on the map.`;
+    } else {
+      responseText = `Showing locations within ${locationQuery.radius} miles on the map.`;
+    }
     
     const botMessage: MessageType = {
       id: Date.now().toString(),
