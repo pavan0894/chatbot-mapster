@@ -28,30 +28,47 @@ export function calculateDistance(
   return distance;
 }
 
+// Type for location objects that's more flexible with coordinates
+export type LocationWithCoordinates = {
+  coordinates: number[] | [number, number];
+  name: string;
+  description: string;
+};
+
 // Find locations within a specific radius
 export function findLocationsWithinRadius(
-  sourceLocations: Array<{ coordinates: [number, number]; name: string; description: string }>,
-  targetLocations: Array<{ coordinates: [number, number]; name: string; description: string }>,
+  sourceLocations: LocationWithCoordinates[],
+  targetLocations: LocationWithCoordinates[],
   radius: number
 ): { 
-  sourceLocations: Array<{ coordinates: [number, number]; name: string; description: string }>,
-  targetLocations: Array<{ coordinates: [number, number]; name: string; description: string }>,
+  sourceLocations: LocationWithCoordinates[],
+  targetLocations: LocationWithCoordinates[],
   connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
 } {
-  const validSourceLocations: Array<typeof sourceLocations[number]> = [];
-  const validTargetLocations: Array<typeof targetLocations[number]> = [];
+  const validSourceLocations: LocationWithCoordinates[] = [];
+  const validTargetLocations: LocationWithCoordinates[] = [];
   const connections: Array<{ source: [number, number]; target: [number, number]; distance: number }> = [];
   
   // Check each source against each target
   sourceLocations.forEach(source => {
     let hasNearbyTarget = false;
     
+    // Ensure source coordinates are a tuple of exactly two numbers
+    const sourceCoords: [number, number] = Array.isArray(source.coordinates) && source.coordinates.length >= 2 
+      ? [source.coordinates[0], source.coordinates[1]]
+      : [0, 0]; // Default if invalid
+    
     targetLocations.forEach(target => {
+      // Ensure target coordinates are a tuple of exactly two numbers
+      const targetCoords: [number, number] = Array.isArray(target.coordinates) && target.coordinates.length >= 2
+        ? [target.coordinates[0], target.coordinates[1]]
+        : [0, 0]; // Default if invalid
+      
       const distance = calculateDistance(
-        source.coordinates[0], 
-        source.coordinates[1], 
-        target.coordinates[0], 
-        target.coordinates[1]
+        sourceCoords[0], 
+        sourceCoords[1], 
+        targetCoords[0], 
+        targetCoords[1]
       );
       
       if (distance <= radius) {
@@ -59,16 +76,16 @@ export function findLocationsWithinRadius(
         
         // Only add target if not already added
         if (!validTargetLocations.some(loc => 
-          loc.coordinates[0] === target.coordinates[0] && 
-          loc.coordinates[1] === target.coordinates[1]
+          loc.coordinates[0] === targetCoords[0] && 
+          loc.coordinates[1] === targetCoords[1]
         )) {
           validTargetLocations.push(target);
         }
         
         // Add this connection
         connections.push({
-          source: source.coordinates,
-          target: target.coordinates,
+          source: sourceCoords,
+          target: targetCoords,
           distance
         });
       }
