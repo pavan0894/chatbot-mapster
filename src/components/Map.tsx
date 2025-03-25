@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -263,6 +264,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     // Remove existing filtered markers and connections
     clearFilteredLocations();
     
+    // Hide all existing markers first
+    clearAllMarkers();
+    
     // Find locations within the radius
     const sourceData = query.source === 'fedex' ? FEDEX_LOCATIONS : INDUSTRIAL_PROPERTIES;
     const targetData = query.source === 'fedex' ? INDUSTRIAL_PROPERTIES : FEDEX_LOCATIONS;
@@ -275,14 +279,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log("Found connections:", connections.length);
     
-    // If no connections found, show toast and keep all markers
+    // If no connections found, show toast and reset map
     if (connections.length === 0) {
       console.log("No locations found within the radius");
+      // Add all markers back since there are no filtered results
+      addIndustrialProperties();
+      addFedExLocations();
       return;
     }
-    
-    // Hide all existing markers
-    clearAllMarkers();
     
     // Add filtered source locations
     addFilteredLocations(sourceLocations, query.source, '#4D148C', '#FF6600');
