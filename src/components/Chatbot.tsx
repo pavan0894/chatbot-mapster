@@ -57,14 +57,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setIsLoading(true);
     
     try {
-      // Convert our messages to the format expected by OpenAI
+      // Convert our messages to the format expected by OpenAI, ensuring correct type for 'role'
       const aiMessages: ChatMessageData[] = messages
         .map(msg => ({
-          role: msg.sender === 'bot' ? 'assistant' : 'user',
+          role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
           content: msg.text
         }))
         .concat({
-          role: 'user',
+          role: 'user' as const,
           content: inputValue
         });
       
