@@ -3,13 +3,13 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Package } from 'lucide-react';
 import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
-import { findLocationsWithinRadius } from '@/utils/mapUtils';
+import { findLocationsWithinRadius, LocationWithCoordinates } from '@/utils/mapUtils';
 
 // Using the provided Mapbox token
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
 // Dallas area industrial properties
-const INDUSTRIAL_PROPERTIES = [
+const INDUSTRIAL_PROPERTIES: LocationWithCoordinates[] = [
   { name: "Dallas Logistics Hub", coordinates: [-96.7559, 32.7323], description: "Major logistics facility" },
   { name: "Southport Logistics Park", coordinates: [-96.8512, 32.6891], description: "Modern warehouse complex" },
   { name: "Pinnacle Industrial Center", coordinates: [-96.9137, 32.7982], description: "Manufacturing facility" },
@@ -33,7 +33,7 @@ const INDUSTRIAL_PROPERTIES = [
 ];
 
 // FedEx locations around Dallas
-const FEDEX_LOCATIONS = [
+const FEDEX_LOCATIONS: LocationWithCoordinates[] = [
   { name: "FedEx Ship Center - Downtown", coordinates: [-96.8066, 32.7791], description: "Shipping & pickup services" },
   { name: "FedEx Office - Uptown", coordinates: [-96.8031, 32.7956], description: "Printing & shipping services" },
   { name: "FedEx Ground - North Dallas", coordinates: [-96.7351, 32.9119], description: "Package delivery hub" },
@@ -294,12 +294,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     addConnectionLines(connections);
     
     // Fit the map to show all the filtered locations
-    fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => loc.coordinates as [number, number]));
+    fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
+      // Ensure we have a valid [number, number] tuple
+      const coords = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+        ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
+        : [0, 0] as [number, number];
+      return coords;
+    }));
   };
 
   // Add filtered locations to the map
   const addFilteredLocations = (
-    locations: Array<{ coordinates: [number, number]; name: string; description: string }>,
+    locations: LocationWithCoordinates[],
     locationType: 'fedex' | 'property',
     bgColor: string,
     borderColor: string
@@ -346,9 +352,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           </div>
         `);
       
+      // Ensure coordinates is a valid [number, number] tuple
+      const coordinates = Array.isArray(location.coordinates) && location.coordinates.length >= 2 
+        ? [location.coordinates[0], location.coordinates[1]] as [number, number]
+        : [0, 0] as [number, number];
+      
       // Add marker to map
       const marker = new mapboxgl.Marker(el)
-        .setLngLat(location.coordinates)
+        .setLngLat(coordinates)
         .setPopup(popup)
         .addTo(map.current!);
       
