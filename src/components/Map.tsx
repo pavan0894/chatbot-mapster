@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Package } from 'lucide-react';
+import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
+import { findLocationsWithinRadius } from '@/utils/mapUtils';
 
 // Using the provided Mapbox token
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
@@ -62,7 +64,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapInitialized, setMapInitialized] = useState<boolean>(false);
+  const [activeMarkers, setActiveMarkers] = useState<mapboxgl.Marker[]>([]);
+  const [activeLayers, setActiveLayers] = useState<string[]>([]);
 
+  // Init map
   const initializeMap = () => {
     if (!mapContainer.current || mapInitialized) return;
 
@@ -163,6 +168,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const addIndustrialProperties = () => {
     if (!map.current) return;
 
+    const markers: mapboxgl.Marker[] = [];
+
     INDUSTRIAL_PROPERTIES.forEach(property => {
       // Create a custom marker element
       const el = document.createElement('div');
@@ -183,16 +190,23 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         `);
 
       // Add marker to map
-      new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker(el)
         .setLngLat(property.coordinates as [number, number])
         .setPopup(popup)
-        .addTo(map.current);
+        .addTo(map.current!);
+      
+      markers.push(marker);
     });
+
+    // Save the markers reference
+    setActiveMarkers(prev => [...prev, ...markers]);
   };
 
   // Function to add FedEx location markers to the map
   const addFedExLocations = () => {
     if (!map.current) return;
+
+    const markers: mapboxgl.Marker[] = [];
 
     FEDEX_LOCATIONS.forEach(location => {
       // Create a custom marker element
@@ -229,18 +243,261 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         `);
 
       // Add marker to map
-      new mapboxgl.Marker(el)
+      const marker = new mapboxgl.Marker(el)
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
-        .addTo(map.current);
+        .addTo(map.current!);
+      
+      markers.push(marker);
     });
+
+    // Save the markers reference
+    setActiveMarkers(prev => [...prev, ...markers]);
+  };
+
+  // Handle location queries
+  const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
+    const query = event.detail;
+    console.log("Location query received:", query);
+    
+    // Remove existing filtered markers and connections
+    clearFilteredLocations();
+    
+    // Find locations within the radius
+    const sourceData = query.source === 'fedex' ? FEDEX_LOCATIONS : INDUSTRIAL_PROPERTIES;
+    const targetData = query.source === 'fedex' ? INDUSTRIAL_PROPERTIES : FEDEX_LOCATIONS;
+    
+    const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
+      sourceData,
+      targetData,
+      query.radius
+    );
+    
+    console.log("Found connections:", connections.length);
+    
+    // If no connections found, show toast and keep all markers
+    if (connections.length === 0) {
+      console.log("No locations found within the radius");
+      return;
+    }
+    
+    // Hide all existing markers
+    clearAllMarkers();
+    
+    // Add filtered source locations
+    addFilteredLocations(sourceLocations, query.source, '#4D148C', '#FF6600');
+    
+    // Add filtered target locations
+    addFilteredLocations(targetLocations, query.source === 'fedex' ? 'property' : 'fedex', '#333', '#fff');
+    
+    // Add connection lines between locations
+    addConnectionLines(connections);
+    
+    // Fit the map to show all the filtered locations
+    fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => loc.coordinates as [number, number]));
+  };
+
+  // Add filtered locations to the map
+  const addFilteredLocations = (
+    locations: Array<{ coordinates: [number, number]; name: string; description: string }>,
+    locationType: 'fedex' | 'property',
+    bgColor: string,
+    borderColor: string
+  ) => {
+    if (!map.current || !locations.length) return;
+    
+    const markers: mapboxgl.Marker[] = [];
+    
+    locations.forEach(location => {
+      // Create a custom marker element
+      const el = document.createElement('div');
+      el.className = `${locationType}-marker-filtered`;
+      el.style.width = locationType === 'fedex' ? '28px' : '20px';
+      el.style.height = locationType === 'fedex' ? '28px' : '20px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = bgColor;
+      el.style.border = `2px solid ${borderColor}`;
+      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+      el.style.cursor = 'pointer';
+      el.style.zIndex = '10';
+      
+      if (locationType === 'fedex') {
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        
+        // Add FedEx logo/icon
+        const icon = document.createElement('div');
+        icon.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19 8.5L12 14L5 8.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `;
+        el.appendChild(icon);
+      }
+      
+      // Create popup for the marker
+      const popup = new mapboxgl.Popup({ offset: 25 })
+        .setHTML(`
+          <div style="padding: 5px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px; ${locationType === 'fedex' ? 'color: #4D148C;' : ''}">${location.name}</h3>
+            <p style="margin: 0;">${location.description}</p>
+          </div>
+        `);
+      
+      // Add marker to map
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates)
+        .setPopup(popup)
+        .addTo(map.current!);
+      
+      markers.push(marker);
+    });
+    
+    // Save the markers reference
+    setActiveMarkers(prev => [...prev, ...markers]);
+  };
+
+  // Add connection lines between locations
+  const addConnectionLines = (
+    connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
+  ) => {
+    if (!map.current || !connections.length) return;
+    
+    // Add the source for the connection lines
+    map.current.addSource('connections', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: connections.map((connection, index) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [connection.source, connection.target]
+          },
+          properties: {
+            id: `connection-${index}`,
+            distance: connection.distance.toFixed(2)
+          }
+        }))
+      }
+    });
+    
+    // Add the connection lines layer
+    map.current.addLayer({
+      id: 'connections-layer',
+      type: 'line',
+      source: 'connections',
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#FF6600',
+        'line-width': 2,
+        'line-opacity': 0.7,
+        'line-dasharray': [2, 1]
+      }
+    });
+    
+    // Add the distance labels layer
+    map.current.addLayer({
+      id: 'connections-labels',
+      type: 'symbol',
+      source: 'connections',
+      layout: {
+        'text-field': '{distance} mi',
+        'text-font': ['Open Sans Regular'],
+        'text-size': 12,
+        'text-offset': [0, -0.5],
+        'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
+        'text-radial-offset': 0.6,
+        'text-justify': 'auto'
+      },
+      paint: {
+        'text-color': '#333',
+        'text-halo-color': '#fff',
+        'text-halo-width': 2
+      }
+    });
+    
+    // Save active layers
+    setActiveLayers(prev => [...prev, 'connections-layer', 'connections-labels']);
+  };
+
+  // Fit map to filtered locations
+  const fitMapToLocations = (coordinates: [number, number][]) => {
+    if (!map.current || !coordinates.length) return;
+    
+    const bounds = coordinates.reduce((bounds, coord) => {
+      return bounds.extend(coord);
+    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+    
+    map.current.fitBounds(bounds, {
+      padding: 50,
+      maxZoom: 11
+    });
+  };
+
+  // Clear all existing markers
+  const clearAllMarkers = () => {
+    activeMarkers.forEach(marker => marker.remove());
+    setActiveMarkers([]);
+  };
+
+  // Clear filtered locations
+  const clearFilteredLocations = () => {
+    // Remove any existing connection layers
+    if (map.current) {
+      activeLayers.forEach(layerId => {
+        if (map.current && map.current.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+      });
+      
+      // Remove any existing sources
+      if (map.current.getSource('connections')) {
+        map.current.removeSource('connections');
+      }
+    }
+    
+    setActiveLayers([]);
+  };
+
+  // Reset map to show all locations
+  const resetMap = () => {
+    clearFilteredLocations();
+    clearAllMarkers();
+    
+    if (map.current) {
+      // Reset the view
+      map.current.flyTo({
+        center: [-96.7970, 32.7767], // Dallas
+        zoom: 9,
+        pitch: 45,
+        bearing: 0
+      });
+      
+      // Re-add all markers
+      addIndustrialProperties();
+      addFedExLocations();
+    }
   };
 
   useEffect(() => {
     initializeMap();
     
+    // Listen for location query events
+    const handleLocationQueryTyped = (e: Event) => {
+      handleLocationQuery(e as CustomEvent<LocationQuery>);
+    };
+    
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
+    
     // Cleanup
     return () => {
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
       map.current?.remove();
     };
   }, []);
@@ -252,6 +509,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/10" />
         <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-background/20 to-transparent" />
       </div>
+      
+      {/* Reset button */}
+      <button 
+        onClick={resetMap}
+        className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm text-foreground px-3 py-1.5 text-sm rounded-md shadow-md hover:bg-white flex items-center gap-1.5 transition-colors border border-border"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+          <path d="M16 16h5v5"/>
+        </svg>
+        Reset Map
+      </button>
     </div>
   );
 };

@@ -5,10 +5,21 @@ import ChatMessage, { MessageType } from './ChatMessage';
 import { cn } from '@/lib/utils';
 import { getAIResponse, ChatMessageData } from '@/services/openaiService';
 import { toast } from 'sonner';
+import { calculateDistance } from '@/utils/mapUtils';
 
 interface ChatbotProps {
   className?: string;
 }
+
+export interface LocationQuery {
+  type: 'location_search';
+  source: 'fedex' | 'property';
+  radius: number;
+  targetLocation?: [number, number]; // [longitude, latitude]
+}
+
+// Define a custom event for location queries
+export const LOCATION_QUERY_EVENT = 'location-query-event';
 
 const initialMessages: MessageType[] = [
   {
@@ -39,6 +50,53 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     inputRef.current?.focus();
   }, []);
 
+  // Function to check if message is asking about properties near FedEx
+  const isLocationQuery = (message: string): LocationQuery | null => {
+    const lowerMsg = message.toLowerCase();
+    
+    // Check for properties near FedEx query
+    if (
+      (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
+      lowerMsg.includes('fedex') && 
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius'))
+    ) {
+      // Extract radius if mentioned
+      let radius = 3; // Default radius in miles
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
+      if (radiusMatch) {
+        radius = parseInt(radiusMatch[1]);
+      }
+      
+      return {
+        type: 'location_search',
+        source: 'fedex',
+        radius: radius
+      };
+    }
+    
+    // Check for FedEx locations near properties query
+    if (
+      lowerMsg.includes('fedex') && 
+      (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
+      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius'))
+    ) {
+      // Extract radius if mentioned
+      let radius = 3; // Default radius in miles
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
+      if (radiusMatch) {
+        radius = parseInt(radiusMatch[1]);
+      }
+      
+      return {
+        type: 'location_search',
+        source: 'property',
+        radius: radius
+      };
+    }
+    
+    return null;
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -57,34 +115,57 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setIsLoading(true);
     
     try {
-      // Convert our messages to the format expected by OpenAI, ensuring correct type for 'role'
-      const aiMessages: ChatMessageData[] = messages
-        .map(msg => ({
-          role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
-          content: msg.text
-        }))
-        .concat({
-          role: 'user' as const,
-          content: inputValue
+      // Check if this is a location query
+      const locationQuery = isLocationQuery(inputValue);
+      
+      if (locationQuery) {
+        // Dispatch custom event for map component to listen to
+        const locationEvent = new CustomEvent(LOCATION_QUERY_EVENT, { 
+          detail: locationQuery 
         });
-      
-      // Get response from AI service
-      const response = await getAIResponse(aiMessages);
-      
-      if (response.error) {
-        toast.error(response.error);
-        return;
+        window.dispatchEvent(locationEvent);
+        
+        // Add bot response for location query
+        const responseText = `Showing ${locationQuery.source === 'fedex' ? 'properties' : 'FedEx locations'} within ${locationQuery.radius} miles of ${locationQuery.source === 'fedex' ? 'FedEx locations' : 'industrial properties'} on the map.`;
+        
+        const botMessage: MessageType = {
+          id: Date.now().toString(),
+          text: responseText,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        // Convert our messages to the format expected by OpenAI, ensuring correct type for 'role'
+        const aiMessages: ChatMessageData[] = messages
+          .map(msg => ({
+            role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
+            content: msg.text
+          }))
+          .concat({
+            role: 'user' as const,
+            content: inputValue
+          });
+        
+        // Get response from AI service
+        const response = await getAIResponse(aiMessages);
+        
+        if (response.error) {
+          toast.error(response.error);
+          return;
+        }
+        
+        // Add bot response
+        const botMessage: MessageType = {
+          id: Date.now().toString(),
+          text: response.text,
+          sender: 'bot',
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
       }
-      
-      // Add bot response
-      const botMessage: MessageType = {
-        id: Date.now().toString(),
-        text: response.text,
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      
-      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error("Error in chat:", error);
       toast.error("Something went wrong. Please try again.");
