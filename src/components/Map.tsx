@@ -1,11 +1,9 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// This should be replaced with your actual Mapbox token
-// We'll provide a way for users to input this for testing
-const DEFAULT_MAPBOX_TOKEN = '';
+// Using the provided Mapbox token
+const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
 interface MapProps {
   className?: string;
