@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
