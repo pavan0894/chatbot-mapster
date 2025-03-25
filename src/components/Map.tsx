@@ -118,8 +118,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   return (
     <div className={`relative h-full ${className}`}>
-      <div ref={mapContainer} className="absolute inset-0 rounded-3xl overflow-hidden" />
-      <div className="absolute inset-0 pointer-events-none rounded-3xl overflow-hidden shadow-lg">
+      <div ref={mapContainer} className="absolute inset-0" />
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/10" />
         <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-background/20 to-transparent" />
       </div>

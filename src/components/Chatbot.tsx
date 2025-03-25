@@ -81,15 +81,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   };
 
   return (
-    <div className={cn("chatbot-container", className)}>
-      <div className="message-list">
+    <div className={cn("flex flex-col h-full bg-background/80 backdrop-blur-sm", className)}>
+      <div className="p-3 border-b border-border">
+        <h2 className="text-lg font-medium">Chat Assistant</h2>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map(message => (
           <ChatMessage key={message.id} message={message} />
         ))}
         <div ref={messagesEndRef} />
       </div>
       
-      <form onSubmit={handleSendMessage} className="input-container">
+      <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-background/50 backdrop-blur-sm">
         <div className="flex items-center gap-2">
           <input
             ref={inputRef}
