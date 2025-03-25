@@ -56,7 +56,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
   }, []);
 
-  // Convert message history to ChatMessageData format for the AI service
   const getMessageHistory = (): ChatMessageData[] => {
     return messages.map(msg => ({
       role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
@@ -64,17 +63,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     }));
   };
 
-  // Function to check if message is asking about locations
   const isLocationQuery = (message: string): LocationQuery | null => {
     const lowerMsg = message.toLowerCase();
     
-    // Check for properties near FedEx query
     if (
       (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
       lowerMsg.includes('fedex') && 
       (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
-      // Extract radius if mentioned
       let radius = 3; // Default radius in miles
       const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
       if (radiusMatch) {
@@ -89,7 +85,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       };
     }
     
-    // Check for FedEx locations near properties query
     if (
       lowerMsg.includes('fedex') && 
       (
@@ -100,7 +95,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       ) && 
       (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
-      // Extract radius if mentioned
       let radius = 3; // Default radius in miles
       const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
       if (radiusMatch) {
@@ -115,19 +109,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       };
     }
     
-    // Check for Starbucks related queries
     if (
       lowerMsg.includes('starbucks') &&
       (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
-      // Extract radius if mentioned
       let radius = 3; // Default radius in miles
       const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
       if (radiusMatch) {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine if Starbucks is the source or target based on query structure
       let source: LocationSourceTarget = 'starbucks';
       let target: LocationSourceTarget | undefined = 'property';
       
@@ -157,20 +148,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       };
     }
     
-    // Check for properties or FedEx near Starbucks
     if (
       (lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('fedex')) &&
       lowerMsg.includes('starbucks') &&
       (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
     ) {
-      // Extract radius if mentioned
       let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
+      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi|radius)/);
       if (radiusMatch) {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine source and target based on word order
       let source: LocationSourceTarget;
       let target: LocationSourceTarget;
       
@@ -199,8 +187,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius
       };
     }
-
-    // Simplified location queries with just radius
+    
     if (
       (lowerMsg.includes('fedex') || lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('starbucks')) &&
       (lowerMsg.includes('mile') || lowerMsg.includes('miles') || lowerMsg.includes('radius'))
@@ -211,34 +198,32 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      // Determine source and target based on query
       let source: LocationSourceTarget = 'property';
       let target: LocationSourceTarget | undefined;
       
       if (lowerMsg.includes('starbucks') && lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
-          source = 'starbucks';
-          target = 'fedex';
+          source = 'starbucks' as LocationSourceTarget;
+          target = 'fedex' as LocationSourceTarget;
         } else {
-          source = 'fedex';
-          target = 'starbucks';
+          source = 'fedex' as LocationSourceTarget;
+          target = 'starbucks' as LocationSourceTarget;
         }
-      // Fix for line 289 - use type-safe comparison with the LocationSourceTarget type
       } else if (lowerMsg.includes('starbucks') && (lowerMsg.includes('property') || lowerMsg.includes('properties'))) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
-          source = 'starbucks';
-          target = 'property';
+          source = 'starbucks' as LocationSourceTarget;
+          target = 'property' as LocationSourceTarget;
         } else {
-          source = 'property';
-          target = 'starbucks';
+          source = 'property' as LocationSourceTarget;
+          target = 'starbucks' as LocationSourceTarget;
         }
       } else if (lowerMsg.includes('fedex')) {
-        source = 'fedex';
+        source = 'fedex' as LocationSourceTarget;
         if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
-          target = 'property';
+          target = 'property' as LocationSourceTarget;
         }
       } else if (lowerMsg.includes('starbucks')) {
-        source = 'starbucks';
+        source = 'starbucks' as LocationSourceTarget;
       }
       
       return {
@@ -249,13 +234,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       };
     }
     
-    // Direct Starbucks query for showing all Starbucks locations
     if (lowerMsg.includes('starbucks') && 
         (lowerMsg.includes('show') || lowerMsg.includes('display') || lowerMsg.includes('where') || 
          lowerMsg.includes('find') || lowerMsg.includes('locate') || lowerMsg.includes('search'))) {
       return {
         type: 'location_search',
-        source: 'starbucks',
+        source: 'starbucks' as LocationSourceTarget,
         radius: 10 // Larger default radius for general searches
       };
     }
@@ -263,15 +247,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     return null;
   };
 
-  // Function to handle location queries immediately
   const handleLocationQuery = (locationQuery: LocationQuery) => {
-    // Dispatch custom event for map component to listen to
     const locationEvent = new CustomEvent(LOCATION_QUERY_EVENT, { 
       detail: locationQuery 
     });
     window.dispatchEvent(locationEvent);
     
-    // Generate response text based on query
     let responseText = '';
     
     if (locationQuery.target) {
@@ -301,7 +282,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages(prev => [...prev, botMessage]);
     setIsLoading(false);
     
-    // Generate new suggested questions based on updated conversation history
     const updatedHistory = [
       ...getMessageHistory(),
       { role: 'assistant' as const, content: responseText }
@@ -310,7 +290,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   };
 
   const handleSuggestedQuestionClick = (question: string) => {
-    // Add the clicked question as a user message
     const userMessage: MessageType = {
       id: Date.now().toString(),
       text: question,
@@ -321,27 +300,22 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
-    // Process the question
     processMessage(question);
   };
 
   const processMessage = async (message: string) => {
     try {
-      // Check if this is a location query
       const locationQuery = isLocationQuery(message);
       
       if (locationQuery) {
-        // Handle location query immediately
         handleLocationQuery(locationQuery);
       } else {
-        // Convert our messages to the format expected by OpenAI
         const aiMessages: ChatMessageData[] = getMessageHistory()
           .concat({
             role: 'user' as const,
             content: message
           });
         
-        // Get response from AI service
         const response = await getAIResponse(aiMessages);
         
         if (response.error) {
@@ -350,7 +324,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           return;
         }
         
-        // Add bot response
         const botMessage: MessageType = {
           id: Date.now().toString(),
           text: response.text,
@@ -361,7 +334,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         setMessages(prev => [...prev, botMessage]);
         setIsLoading(false);
         
-        // Generate new suggested questions based on updated conversation history
         const updatedHistory = [
           ...aiMessages,
           { role: 'assistant' as const, content: response.text }
@@ -380,7 +352,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     if (!inputValue.trim() || isLoading) return;
     
-    // Add user message
     const userMessage: MessageType = {
       id: Date.now().toString(),
       text: inputValue,
@@ -392,7 +363,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setInputValue('');
     setIsLoading(true);
     
-    // Process the message
     await processMessage(inputValue);
   };
 
@@ -420,7 +390,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Suggested Questions */}
       {!isLoading && suggestedQuestions.length > 0 && (
         <div className="px-3 py-2 border-t border-border bg-muted/30">
           <p className="text-xs text-muted-foreground mb-2">Suggested questions:</p>
