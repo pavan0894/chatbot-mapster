@@ -2,7 +2,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Package } from 'lucide-react';
 import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
 import { findLocationsWithinRadius, LocationWithCoordinates } from '@/utils/mapUtils';
 
@@ -68,109 +67,119 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [activeMarkers, setActiveMarkers] = useState<mapboxgl.Marker[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
 
-  // Init map
-  const initializeMap = () => {
+  // Initialize map when component mounts
+  useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
-
+    
     try {
-      // Initialize map
+      console.log("Initializing map...");
       mapboxgl.accessToken = DEFAULT_MAPBOX_TOKEN;
       
-      map.current = new mapboxgl.Map({
+      const newMap = new mapboxgl.Map({
         container: mapContainer.current,
         style: 'mapbox://styles/mapbox/light-v11',
         projection: 'globe',
-        zoom: 9, // Higher zoom to focus on Dallas area
+        zoom: 9,
         center: [-96.7970, 32.7767], // Dallas, TX coordinates
         pitch: 45,
       });
-
+      
+      map.current = newMap;
+      
       // Add navigation controls
-      map.current.addControl(
+      newMap.addControl(
         new mapboxgl.NavigationControl({
           visualizePitch: true,
         }),
         'top-right'
       );
-
+      
       // Disable scroll zoom for smoother experience
-      map.current.scrollZoom.disable();
-
-      // Add atmosphere and fog effects
-      map.current.on('style.load', () => {
-        map.current?.setFog({
+      newMap.scrollZoom.disable();
+      
+      // Wait for map to load before adding features
+      newMap.on('load', () => {
+        console.log("Map loaded successfully");
+        
+        // Add atmosphere and fog effects
+        newMap.setFog({
           color: 'rgb(255, 255, 255)',
           'high-color': 'rgb(200, 200, 225)',
           'horizon-blend': 0.2,
         });
-
-        // Add industrial properties and FedEx locations as markers after the map style has loaded
+        
+        // Add industrial properties and FedEx locations as markers
         addIndustrialProperties();
         addFedExLocations();
+        
+        setMapInitialized(true);
       });
-
+      
       // Rotation animation settings
       const secondsPerRevolution = 240;
       const maxSpinZoom = 5;
       const slowSpinZoom = 3;
       let userInteracting = false;
       let spinEnabled = true;
-
+      
       // Spin globe function
       function spinGlobe() {
-        if (!map.current) return;
+        if (!newMap) return;
         
-        const zoom = map.current.getZoom();
+        const zoom = newMap.getZoom();
         if (spinEnabled && !userInteracting && zoom < maxSpinZoom) {
           let distancePerSecond = 360 / secondsPerRevolution;
           if (zoom > slowSpinZoom) {
             const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom);
             distancePerSecond *= zoomDif;
           }
-          const center = map.current.getCenter();
+          const center = newMap.getCenter();
           center.lng -= distancePerSecond;
-          map.current.easeTo({ center, duration: 1000, easing: (n) => n });
+          newMap.easeTo({ center, duration: 1000, easing: (n) => n });
         }
       }
-
+      
       // Event listeners for interaction
-      map.current.on('mousedown', () => {
+      newMap.on('mousedown', () => {
         userInteracting = true;
       });
       
-      map.current.on('dragstart', () => {
+      newMap.on('dragstart', () => {
         userInteracting = true;
       });
       
-      map.current.on('mouseup', () => {
+      newMap.on('mouseup', () => {
         userInteracting = false;
         spinGlobe();
       });
       
-      map.current.on('touchend', () => {
+      newMap.on('touchend', () => {
         userInteracting = false;
         spinGlobe();
       });
-
-      map.current.on('moveend', () => {
+      
+      newMap.on('moveend', () => {
         spinGlobe();
       });
-
+      
       // Start the globe spinning
       spinGlobe();
       
-      setMapInitialized(true);
     } catch (error) {
       console.error("Error initializing map:", error);
     }
-  };
+  }, [mapInitialized]);
 
   // Function to add industrial property markers to the map
   const addIndustrialProperties = () => {
-    if (!map.current) return;
-
+    if (!map.current) {
+      console.error("Map not initialized when adding industrial properties");
+      return;
+    }
+    
+    console.log("Adding industrial properties markers");
     const markers: mapboxgl.Marker[] = [];
-
+    
     INDUSTRIAL_PROPERTIES.forEach(property => {
       // Create a custom marker element
       const el = document.createElement('div');
@@ -182,33 +191,37 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.style.border = '2px solid #fff';
       el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
       el.style.cursor = 'pointer';
-
+      
       // Create popup for the marker
       const popup = new mapboxgl.Popup({ offset: 25 })
         .setHTML(`
           <h3 style="font-weight: bold; margin-bottom: 5px;">${property.name}</h3>
           <p style="margin: 0;">${property.description}</p>
         `);
-
+      
       // Add marker to map
       const marker = new mapboxgl.Marker(el)
         .setLngLat(property.coordinates as [number, number])
         .setPopup(popup)
-        .addTo(map.current!);
+        .addTo(map.current);
       
       markers.push(marker);
     });
-
+    
     // Save the markers reference
     setActiveMarkers(prev => [...prev, ...markers]);
   };
 
   // Function to add FedEx location markers to the map
   const addFedExLocations = () => {
-    if (!map.current) return;
-
+    if (!map.current) {
+      console.error("Map not initialized when adding FedEx locations");
+      return;
+    }
+    
+    console.log("Adding FedEx locations markers");
     const markers: mapboxgl.Marker[] = [];
-
+    
     FEDEX_LOCATIONS.forEach(location => {
       // Create a custom marker element
       const el = document.createElement('div');
@@ -223,7 +236,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.style.display = 'flex';
       el.style.alignItems = 'center';
       el.style.justifyContent = 'center';
-
+      
       // Add FedEx logo/icon
       const icon = document.createElement('div');
       icon.innerHTML = `
@@ -233,7 +246,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         </svg>
       `;
       el.appendChild(icon);
-
+      
       // Create popup for the marker
       const popup = new mapboxgl.Popup({ offset: 25 })
         .setHTML(`
@@ -242,24 +255,29 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             <p style="margin: 0;">${location.description}</p>
           </div>
         `);
-
+      
       // Add marker to map
       const marker = new mapboxgl.Marker(el)
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
-        .addTo(map.current!);
+        .addTo(map.current);
       
       markers.push(marker);
     });
-
+    
     // Save the markers reference
     setActiveMarkers(prev => [...prev, ...markers]);
   };
 
-  // Handle location queries
+  // Function to handle location queries
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
     const query = event.detail;
     console.log("Location query received:", query);
+    
+    if (!map.current) {
+      console.error("Map not initialized when handling location query");
+      return;
+    }
     
     // Remove existing filtered markers and connections
     clearFilteredLocations();
@@ -314,7 +332,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     bgColor: string,
     borderColor: string
   ) => {
-    if (!map.current || !locations.length) return;
+    if (!map.current || !locations.length) {
+      console.error("Map not initialized or no locations when adding filtered locations");
+      return;
+    }
     
     const markers: mapboxgl.Marker[] = [];
     
@@ -365,7 +386,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const marker = new mapboxgl.Marker(el)
         .setLngLat(coordinates)
         .setPopup(popup)
-        .addTo(map.current!);
+        .addTo(map.current);
       
       markers.push(marker);
     });
@@ -378,7 +399,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const addConnectionLines = (
     connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
   ) => {
-    if (!map.current || !connections.length) return;
+    if (!map.current || !connections.length) {
+      console.error("Map not initialized or no connections when adding connection lines");
+      return;
+    }
+    
+    // Check if source already exists and remove it
+    if (map.current.getSource('connections')) {
+      activeLayers.forEach(layerId => {
+        if (map.current && map.current.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+      });
+      map.current.removeSource('connections');
+    }
     
     // Add the source for the connection lines
     map.current.addSource('connections', {
@@ -438,12 +472,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     // Save active layers
-    setActiveLayers(prev => [...prev, 'connections-layer', 'connections-labels']);
+    setActiveLayers(['connections-layer', 'connections-labels']);
   };
 
   // Fit map to filtered locations
   const fitMapToLocations = (coordinates: [number, number][]) => {
-    if (!map.current || !coordinates.length) return;
+    if (!map.current || !coordinates.length) {
+      console.error("Map not initialized or no coordinates when fitting map to locations");
+      return;
+    }
     
     const bounds = coordinates.reduce((bounds, coord) => {
       return bounds.extend(coord);
@@ -457,6 +494,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   // Clear all existing markers
   const clearAllMarkers = () => {
+    console.log("Clearing all markers, count:", activeMarkers.length);
     activeMarkers.forEach(marker => marker.remove());
     setActiveMarkers([]);
   };
@@ -482,28 +520,32 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   // Reset map to show all locations
   const resetMap = () => {
+    if (!map.current) {
+      console.error("Map not initialized when resetting map");
+      return;
+    }
+    
+    console.log("Resetting map");
     clearFilteredLocations();
     clearAllMarkers();
     
-    if (map.current) {
-      // Reset the view
-      map.current.flyTo({
-        center: [-96.7970, 32.7767], // Dallas
-        zoom: 9,
-        pitch: 45,
-        bearing: 0
-      });
-      
-      // Re-add all markers
-      addIndustrialProperties();
-      addFedExLocations();
-    }
+    // Reset the view
+    map.current.flyTo({
+      center: [-96.7970, 32.7767], // Dallas
+      zoom: 9,
+      pitch: 45,
+      bearing: 0
+    });
+    
+    // Re-add all markers
+    addIndustrialProperties();
+    addFedExLocations();
   };
 
+  // Listen for location query events
   useEffect(() => {
-    initializeMap();
+    console.log("Setting up event listener for location queries");
     
-    // Listen for location query events
     const handleLocationQueryTyped = (e: Event) => {
       handleLocationQuery(e as CustomEvent<LocationQuery>);
     };
@@ -512,13 +554,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Cleanup
     return () => {
+      console.log("Cleaning up map component");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
-      map.current?.remove();
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+      setMapInitialized(false);
     };
   }, []);
 
   return (
-    <div className={`relative h-full ${className}`}>
+    <div className={`relative h-full w-full ${className}`}>
       <div ref={mapContainer} className="absolute inset-0" />
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/10" />
