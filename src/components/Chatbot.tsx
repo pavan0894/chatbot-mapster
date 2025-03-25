@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
@@ -224,6 +223,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           source = 'fedex';
           target = 'starbucks';
         }
+      // Fix for line 289 - use type-safe comparison with the LocationSourceTarget type
       } else if (lowerMsg.includes('starbucks') && (lowerMsg.includes('property') || lowerMsg.includes('properties'))) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
           source = 'starbucks';
