@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -482,8 +483,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         targetDataArray
       );
       
-      // Add property locations with preservation flag
+      console.log(`Found ${result.resultProperties.length} properties that meet multi-target proximity criteria`);
+      
+      // Always add property locations for multi-target queries
       addFilteredLocations(result.resultProperties, 'property', '#3B82F6', '#1E40AF', preserveProperties);
+      
+      // Update displayed properties for results list
+      setDisplayedProperties(result.resultProperties);
       
       const connectedTargets = new Map<LocationSourceTarget, Set<string>>();
       
@@ -501,6 +507,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
+      // Add connection lines to visualize the relationships
       addConnectionLines(result.connections);
       
       targetDataArray.forEach(targetData => {
@@ -530,7 +537,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       fitMapToLocations(allCoordinates);
       
+      // Emit result update to update the property list
       emitResultsUpdate(result.resultProperties);
+      
+      // Update map context to reflect the current query state
+      emitMapContextUpdate({
+        visibleLocations: ['property', ...targetTypes.map(t => t.type)],
+        query,
+        properties: result.resultProperties
+      });
     };
     
     const handleDynamicQuery = (e: Event) => {
