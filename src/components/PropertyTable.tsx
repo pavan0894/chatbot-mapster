@@ -8,16 +8,18 @@ interface PropertyTableProps {
   className?: string;
 }
 
-// Make sure this matches exactly with the event name in Map component
-export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
+// Make sure to use exactly the same constant name as in Map.tsx
+import { MAP_RESULTS_UPDATE_EVENT } from './Map';
 
 const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
   const [properties, setProperties] = useState<LocationWithCoordinates[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [query, setQuery] = useState<string>('');
 
-  // Listen for location query events to show loading state
   useEffect(() => {
+    console.log("PropertyTable: Setting up event listeners");
+    
+    // Listen for location query events to show loading state
     const handleLocationQuery = (e: CustomEvent<LocationQuery>) => {
       const query = e.detail;
       console.log("PropertyTable received location query:", query);
@@ -28,30 +30,37 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
       setProperties([]);
     };
 
-    // Location query event listener
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-    
     // Results update event listener
     const handleResultsUpdate = (e: CustomEvent<{properties: LocationWithCoordinates[]}>) => {
-      console.log("PropertyTable received results update with properties count:", e.detail.properties?.length || 0);
-      if (e.detail && e.detail.properties) {
+      console.log("PropertyTable received results update event:", e.detail);
+      
+      if (e.detail && Array.isArray(e.detail.properties)) {
+        console.log("PropertyTable setting properties:", e.detail.properties.length);
         setProperties(e.detail.properties);
       } else {
         console.error("PropertyTable received invalid results update event:", e.detail);
         setProperties([]);
       }
+      
       setIsLoading(false);
     };
     
-    // Make sure to use the correct event name
+    // Add event listeners with proper type casting
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
     window.addEventListener(MAP_RESULTS_UPDATE_EVENT, handleResultsUpdate as EventListener);
     
     // Cleanup event listeners
     return () => {
+      console.log("PropertyTable: Removing event listeners");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
       window.removeEventListener(MAP_RESULTS_UPDATE_EVENT, handleResultsUpdate as EventListener);
     };
   }, []);
+
+  // Debug properties state changes
+  useEffect(() => {
+    console.log("PropertyTable properties updated:", properties.length);
+  }, [properties]);
 
   return (
     <div className={`p-4 border-t border-border ${className}`}>
