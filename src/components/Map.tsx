@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -135,7 +134,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           'horizon-blend': 0.2,
         });
         
-        // Only add industrial properties on initial load
         addIndustrialProperties();
         
         setMapInitialized(true);
@@ -305,53 +303,40 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // Clear all existing markers and layers first - Order matters here!
     clearAllMarkers();
     clearFilteredLocations();
     
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
-    // If FedEx is not mentioned, only show filtered industrial properties
-    if (!isFedExQuery) {
-      if (query.source === 'property') {
-        // For specific property queries, apply any filtering logic here
-        addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
-        fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
-        emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-        console.log("Showing filtered industrial properties");
-      } else {
-        // Default: no specific query, show all industrial properties
-        addIndustrialProperties();
-      }
+    if (!isFedExQuery && query.source === 'property') {
+      addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
+      fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
       return;
     }
     
     let sourceData: LocationWithCoordinates[];
     let targetData: LocationWithCoordinates[] | null = null;
     
-    // Handle FedEx specific queries
     if (query.source === 'fedex') {
-      sourceData = loadFedExLocations(); // Only load FedEx data when needed
+      sourceData = loadFedExLocations();
       if (query.target === 'property') {
         targetData = INDUSTRIAL_PROPERTIES;
       }
     } else {
       sourceData = INDUSTRIAL_PROPERTIES;
       if (query.target === 'fedex') {
-        targetData = loadFedExLocations(); // Only load FedEx data when needed
+        targetData = loadFedExLocations();
       }
     }
     
-    // Show all FedEx locations if specifically asked for
     if (query.source === 'fedex' && !query.target) {
       const fedExLocations = addFedExLocations();
       fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(fedExLocations);
-      console.log("Showing all FedEx locations:", fedExLocations.length);
       return;
     }
     
-    // Handle relationship queries (e.g., FedEx near properties or properties near FedEx)
     if (targetData) {
       const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
         sourceData,
@@ -359,15 +344,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         query.radius
       );
       
-      console.log("Found connections:", connections.length);
-      
       if (connections.length === 0) {
         console.log("No locations found within the radius");
         emitResultsUpdate([]);
         return;
       }
       
-      // Add filtered markers for matching locations
       addFilteredLocations(sourceLocations, query.source, 
         query.source === 'fedex' ? '#4D148C' : '#333', 
         query.source === 'fedex' ? '#FF6600' : '#fff');
@@ -376,18 +358,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         query.target === 'fedex' ? '#4D148C' : '#333', 
         query.target === 'fedex' ? '#FF6600' : '#fff');
       
-      // Add connection lines between matching locations
       addConnectionLines(connections);
       
-      // Fit the map to show all the matching locations
       fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
-        const coords = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+        return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
           ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
           : [0, 0] as [number, number];
-        return coords;
       }));
       
-      // Update UI with results
       emitResultsUpdate([...sourceLocations, ...targetLocations]);
     }
   };
@@ -475,11 +453,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // First, ensure any existing connections are removed properly
     const layerIds = ['connections-layer', 'connections-labels'];
     checkAndRemoveLayers(map.current, layerIds, 'connections');
     
-    // Now add the new source and layers
     map.current.addSource('connections', {
       type: 'geojson',
       data: {
@@ -561,7 +537,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   const clearFilteredLocations = () => {
     if (map.current) {
-      // Make sure to remove layers before removing the source
       if (activeLayers.length > 0) {
         activeLayers.forEach(layerId => {
           if (map.current && map.current.getLayer(layerId)) {
@@ -569,7 +544,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           }
         });
         
-        // After removing all layers, it's safe to remove the source
         if (map.current.getSource('connections')) {
           map.current.removeSource('connections');
         }
@@ -580,29 +554,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   };
 
   const resetMap = () => {
-    if (!map.current) {
-      console.error("Map not initialized when resetting map");
-      return;
-    }
+    if (!map.current) return;
     
     console.log("Resetting map");
     
-    // First remove layers, then markers
-    if (activeLayers.length > 0) {
-      activeLayers.forEach(layerId => {
-        if (map.current && map.current.getLayer(layerId)) {
-          map.current.removeLayer(layerId);
-        }
-      });
-      
-      if (map.current.getSource('connections')) {
-        map.current.removeSource('connections');
-      }
-      
-      setActiveLayers([]);
-    }
-    
     clearAllMarkers();
+    clearFilteredLocations();
     
     map.current.flyTo({
       center: [-96.7970, 32.7767],
@@ -611,8 +568,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       bearing: 0
     });
     
-    // Reset to show only industrial properties
-    addIndustrialProperties();
+    addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
+    emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 
   useEffect(() => {
