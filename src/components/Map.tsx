@@ -97,6 +97,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
   const [fedExLocations, setFedExLocations] = useState<LocationWithCoordinates[]>([]);
   const [fedExLoaded, setFedExLoaded] = useState<boolean>(false);
+  const [displayedProperties, setDisplayedProperties] = useState<LocationWithCoordinates[]>([]);
 
   useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
@@ -134,9 +135,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           'horizon-blend': 0.2,
         });
         
-        addIndustrialProperties();
-        
         setMapInitialized(true);
+        
+        resetMap();
       });
       
       const secondsPerRevolution = 240;
@@ -223,6 +224,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     setActiveMarkers(prev => [...prev, ...markers]);
+    setDisplayedProperties(INDUSTRIAL_PROPERTIES);
     
     emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
@@ -309,6 +311,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
     if (!isFedExQuery && query.source === 'property') {
+      console.log("Showing only property locations with no filtering");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
       fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(INDUSTRIAL_PROPERTIES);
@@ -331,6 +334,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
     
     if (query.source === 'fedex' && !query.target) {
+      console.log("Showing only FedEx locations with no filtering");
       const fedExLocations = addFedExLocations();
       fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(fedExLocations);
@@ -338,6 +342,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
     
     if (targetData) {
+      console.log(`Finding ${query.source} locations within ${query.radius} miles of ${query.target} locations`);
+      
       const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
         sourceData,
         targetData,
@@ -533,6 +539,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log("Clearing all markers, count:", activeMarkers.length);
     activeMarkers.forEach(marker => marker.remove());
     setActiveMarkers([]);
+    setDisplayedProperties([]);
   };
 
   const clearFilteredLocations = () => {
@@ -569,6 +576,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
+    setDisplayedProperties(INDUSTRIAL_PROPERTIES);
     emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 
@@ -619,3 +627,4 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 };
 
 export default Map;
+
