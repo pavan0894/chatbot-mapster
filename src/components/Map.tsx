@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
+import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT } from './Chatbot';
 import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
@@ -86,6 +86,18 @@ export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
   window.dispatchEvent(event);
 }
 
+export function emitMapContextUpdate(context: {
+  visibleLocations?: string[],
+  query?: LocationQuery,
+  properties?: LocationWithCoordinates[]
+}) {
+  console.log("Emitting map context update:", context);
+  const event = new CustomEvent('map-context-update', { 
+    detail: context 
+  });
+  window.dispatchEvent(event);
+}
+
 interface MapProps {
   className?: string;
 }
@@ -102,6 +114,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [fedExLoaded, setFedExLoaded] = useState<boolean>(false);
   const [starbucksLoaded, setStarbucksLoaded] = useState<boolean>(false);
   const [displayedProperties, setDisplayedProperties] = useState<LocationWithCoordinates[]>([]);
+  const [visibleLocationTypes, setVisibleLocationTypes] = useState<string[]>([]);
+  const [currentQuery, setCurrentQuery] = useState<LocationQuery | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
@@ -289,6 +303,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     setActiveMarkers(prev => [...prev, ...markers]);
+    setVisibleLocationTypes(prev => prev.includes('fedex') ? prev : [...prev, 'fedex']);
+    emitMapContextUpdate({
+      visibleLocations: [...visibleLocationTypes, 'fedex'].filter((v, i, a) => a.indexOf(v) === i)
+    });
     return locations;
   };
 
@@ -353,12 +371,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     setActiveMarkers(prev => [...prev, ...markers]);
     setStarbucksLoaded(true);
+    setVisibleLocationTypes(prev => prev.includes('starbucks') ? prev : [...prev, 'starbucks']);
+    emitMapContextUpdate({
+      visibleLocations: [...visibleLocationTypes, 'starbucks'].filter((v, i, a) => a.indexOf(v) === i)
+    });
     return STARBUCKS_LOCATIONS;
   };
 
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
     const query = event.detail;
     console.log("Location query received in Map component:", query);
+    setCurrentQuery(query);
     
     if (!map.current) {
       console.error("Map not initialized when handling location query");
@@ -367,6 +390,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     clearAllMarkers();
     clearFilteredLocations();
+    setVisibleLocationTypes([]);
     
     const isPropertyInDallas = 
       query.source === 'property' && 
@@ -380,12 +404,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
       fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+      setVisibleLocationTypes(['property']);
+      emitMapContextUpdate({
+        visibleLocations: ['property'],
+        query,
+        properties: INDUSTRIAL_PROPERTIES
+      });
       return;
     }
     
     if (!isFedExQuery && !isStarbucksQuery && query.source === 'property' && !isPropertyInDallas) {
       console.log("Non-Dallas property query, not showing property pins");
       emitResultsUpdate([]);
+      emitMapContextUpdate({
+        visibleLocations: [],
+        query
+      });
       return;
     }
     
@@ -394,24 +428,33 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     if (query.source === 'fedex') {
       sourceData = loadFedExLocations();
+      setVisibleLocationTypes(prev => [...prev, 'fedex']);
       if (query.target === 'property') {
         targetData = INDUSTRIAL_PROPERTIES;
+        setVisibleLocationTypes(prev => [...prev, 'property']);
       } else if (query.target === 'starbucks') {
         targetData = STARBUCKS_LOCATIONS;
+        setVisibleLocationTypes(prev => [...prev, 'starbucks']);
       }
     } else if (query.source === 'starbucks') {
       sourceData = STARBUCKS_LOCATIONS;
+      setVisibleLocationTypes(prev => [...prev, 'starbucks']);
       if (query.target === 'property') {
         targetData = INDUSTRIAL_PROPERTIES;
+        setVisibleLocationTypes(prev => [...prev, 'property']);
       } else if (query.target === 'fedex') {
         targetData = loadFedExLocations();
+        setVisibleLocationTypes(prev => [...prev, 'fedex']);
       }
     } else {
       sourceData = INDUSTRIAL_PROPERTIES;
+      setVisibleLocationTypes(prev => [...prev, 'property']);
       if (query.target === 'fedex') {
         targetData = loadFedExLocations();
+        setVisibleLocationTypes(prev => [...prev, 'fedex']);
       } else if (query.target === 'starbucks') {
         targetData = STARBUCKS_LOCATIONS;
+        setVisibleLocationTypes(prev => [...prev, 'starbucks']);
       }
     }
     
@@ -420,6 +463,26 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const fedExLocations = addFedExLocations();
       fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(fedExLocations);
+      setVisibleLocationTypes(['fedex']);
+      emitMapContextUpdate({
+        visibleLocations: ['fedex'],
+        query,
+        properties: fedExLocations
+      });
+      return;
+    }
+    
+    if (query.source === 'starbucks' && !query.target) {
+      console.log("Showing only Starbucks locations with no filtering");
+      const starbucksLocations = addStarbucksLocations();
+      fitMapToLocations(starbucksLocations.map(loc => loc.coordinates as [number, number]));
+      emitResultsUpdate(starbucksLocations);
+      setVisibleLocationTypes(['starbucks']);
+      emitMapContextUpdate({
+        visibleLocations: ['starbucks'],
+        query,
+        properties: starbucksLocations
+      });
       return;
     }
     
@@ -435,6 +498,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (connections.length === 0) {
         console.log("No locations found within the radius");
         emitResultsUpdate([]);
+        emitMapContextUpdate({
+          visibleLocations: [],
+          query
+        });
         return;
       }
       
@@ -467,7 +534,23 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }));
       
       emitResultsUpdate([...sourceLocations, ...targetLocations]);
+      emitMapContextUpdate({
+        visibleLocations: visibleLocationTypes,
+        query,
+        properties: [...sourceLocations, ...targetLocations]
+      });
     }
+  };
+
+  const handleApiQuery = (event: CustomEvent<{query: string}>) => {
+    const { query } = event.detail;
+    console.log("API query received in Map component:", query);
+    
+    emitMapContextUpdate({
+      visibleLocations: visibleLocationTypes,
+      query: currentQuery || undefined,
+      properties: displayedProperties
+    });
   };
 
   const addFilteredLocations = (
@@ -565,6 +648,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     setActiveMarkers(prev => [...prev, ...markers]);
+    setDisplayedProperties(prev => [...prev, ...locations]);
   };
 
   const addConnectionLines = (
@@ -674,9 +758,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   useEffect(() => {
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    window.addEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
     
     return () => {
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+      window.removeEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
     };
   }, []);
 

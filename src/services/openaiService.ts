@@ -1,3 +1,4 @@
+
 /**
  * Service for communicating with OpenAI API
  */
@@ -180,6 +181,8 @@ export const generateSuggestedQuestions = (messages: ChatMessageData[] = []): st
   // Add generic questions
   suggestions.push(`What's the closest FedEx location to Dallas Logistics Hub?`);
   suggestions.push(`Show me all Starbucks in downtown Dallas.`);
+  suggestions.push(`How many Starbucks locations have drive-thrus?`);
+  suggestions.push(`Which area has the most FedEx locations?`);
   
   // Shuffle and return a subset of suggestions
   return suggestions
@@ -191,7 +194,7 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
   try {
     // Replace this with your actual API endpoint if connected to a backend
     // Currently simulating a delayed response from OpenAI
-    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations, industrial properties, and Starbucks cafes. Provide concise information about locations, distances between different points of interest, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map.";
+    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations, industrial properties, and Starbucks cafes. Provide concise information about locations, distances between different points of interest, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map. Use the provided context about what's currently displayed on the map to give more accurate and relevant answers.";
     
     // Add system message if not already included
     if (!messages.some(msg => msg.role === 'system')) {
@@ -199,6 +202,18 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
     }
     
     console.log("Sending to AI:", messages);
+    
+    // Extract map context from messages
+    const contextMessages = messages.filter(msg => 
+      msg.role === 'system' && 
+      (msg.content.includes('Currently displayed on the map') || 
+       msg.content.includes('The last user query'))
+    );
+    
+    const hasMapContext = contextMessages.length > 0;
+    const displayedLocationTypes = hasMapContext ? 
+      extractLocationsFromContext(contextMessages[0]?.content || '') : 
+      [];
     
     // Simulate API call with shorter timeout for a more responsive feel
     return new Promise((resolve) => {
@@ -221,6 +236,8 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
                           lastUserMessage.includes('near') || lastUserMessage.includes('close');
         const hasQuestion = lastUserMessage.includes('?') || lastUserMessage.includes('where') || 
                           lastUserMessage.includes('show') || lastUserMessage.includes('find');
+        const hasHowMany = lastUserMessage.includes('how many') || lastUserMessage.includes('count');
+        const hasWhich = lastUserMessage.includes('which') || lastUserMessage.includes('what');
         
         // Extract location information
         let mentionedArea = '';
@@ -238,9 +255,85 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
           mentionedRadius = parseInt(radiusMatch[1]);
         }
         
-        // Check if this is a follow-up question
-        if (isFollowUp && lastUserMessage.length < 60 && !lastUserMessage.includes('hello') && !lastUserMessage.includes('hi')) {
-          // ... keep existing code (follow-up handling)
+        // Handle questions about what's currently displayed on the map
+        if (hasHowMany && displayedLocationTypes.length > 0) {
+          if (displayedLocationTypes.includes('starbucks') && hasStarbucks) {
+            responseText = "Based on the current map view, there are 25 Starbucks locations shown. They're distributed throughout the Dallas area, with several in downtown Dallas and the surrounding neighborhoods.\n\nSome of these Starbucks locations have special features like drive-thru services, outdoor seating, and extended hours. Would you like more specific information about any particular Starbucks location?";
+          } else if (displayedLocationTypes.includes('fedex') && hasFedEx) {
+            responseText = "The map currently shows 20 FedEx locations across the Dallas area. These include various service types such as Ship Centers, Office locations, Ground facilities, and Express shipping centers.\n\nThese locations are strategically positioned throughout Dallas to provide convenient access to shipping and business services. Is there a specific area or type of FedEx facility you're interested in?";
+          } else if (displayedLocationTypes.includes('property') && hasProperty) {
+            responseText = "The map is displaying 40 industrial properties in the Dallas area. These include logistics facilities, warehouse complexes, manufacturing facilities, and distribution centers.\n\nThese properties are concentrated in several industrial districts across Dallas, with significant clusters in South Dallas near the logistics hub and in the northern commercial areas. Would you like more details about any specific industrial area?";
+          } else {
+            // General count question
+            const displayedTypes = displayedLocationTypes.join(' and ');
+            responseText = `The map is currently showing ${displayedTypes} locations in the Dallas area. I can help you filter or find specific locations if you'd like. What type of information are you looking for?`;
+          }
+        }
+        // Handle questions about specific attributes
+        else if (hasWhich && displayedLocationTypes.length > 0) {
+          if (displayedLocationTypes.includes('starbucks') && hasStarbucks) {
+            if (lastUserMessage.includes('drive') || lastUserMessage.includes('drive-thru')) {
+              responseText = "Looking at the Starbucks locations on the map, approximately 8 of them have drive-thru service. These are mostly located in suburban areas including:\n\n- Starbucks - Knox Henderson\n- Starbucks - Casa Linda\n- Starbucks - Lovers Lane\n- Starbucks - Skillman & Abrams\n- Starbucks - Mockingbird Station\n\nWould you like me to filter the map to show only drive-thru locations?";
+            } else if (lastUserMessage.includes('outdoor') || lastUserMessage.includes('patio') || lastUserMessage.includes('seating')) {
+              responseText = "Several Starbucks locations on the map have outdoor seating options. The ones with the best outdoor areas include:\n\n- Starbucks - Downtown Dallas (full-service cafe with outdoor seating)\n- Starbucks - West Village (urban cafe with patio seating)\n- Starbucks - Lower Greenville (neighborhood cafe with outdoor tables)\n- Starbucks - White Rock Lake (scenic view with outdoor seating)\n\nThe White Rock Lake location is particularly nice as it offers views of the lake while you enjoy your coffee.";
+            } else if (lastUserMessage.includes('downtown') || lastUserMessage.includes('uptown')) {
+              responseText = "The map shows several Starbucks locations in the downtown and uptown Dallas areas:\n\n- Starbucks - Downtown Dallas\n- Starbucks - Uptown\n- Starbucks - West Village\n\nThe Downtown Dallas location offers full-service cafe with outdoor seating, while the Uptown location features modern design with mobile ordering capabilities. The West Village location is an urban cafe with patio seating that's popular with local professionals.";
+            } else {
+              responseText = "Based on the Starbucks locations displayed on the map, they vary in features and services. Some notable locations include:\n\n- Starbucks in Downtown Dallas has outdoor seating\n- The Mockingbird Station location is transit-friendly\n- SMU Campus Starbucks offers extended hours\n- Several locations including Knox Henderson have drive-thru service\n\nIs there a specific feature or area you're interested in?";
+            }
+          } else if (displayedLocationTypes.includes('fedex') && hasFedEx) {
+            if (lastUserMessage.includes('express') || lastUserMessage.includes('shipping')) {
+              responseText = "Looking at the FedEx locations on the map, there are several Express shipping centers including:\n\n- FedEx Express - Addison\n- FedEx Express - Mesquite\n- FedEx Express - Grand Prairie\n- FedEx Express - Rockwall\n\nThese locations specialize in time-sensitive shipments and offer more delivery options than standard FedEx Ground facilities.";
+            } else if (lastUserMessage.includes('freight') || lastUserMessage.includes('large')) {
+              responseText = "For freight shipping, the map shows these FedEx Freight terminals:\n\n- FedEx Freight - South Dallas\n- FedEx Freight - Arlington\n\nThese locations handle larger shipments and palletized freight. They're strategically positioned to serve the industrial areas of Dallas.";
+            } else {
+              responseText = "The FedEx locations currently shown on the map include several types of facilities:\n\n- Ship Centers: Downtown, Irving, Lewisville\n- Office locations: Uptown, Richardson, Plano, Las Colinas, Frisco, Grapevine\n- Express shipping: Addison, Mesquite, Grand Prairie, Rockwall\n- Ground facilities: North Dallas, Garland, Carrollton, Denton\n- Freight terminals: South Dallas, Arlington\n\nDifferent locations offer different services. Is there a specific service you're looking for?";
+            }
+          } else if (displayedLocationTypes.includes('property') && hasProperty) {
+            if (lastUserMessage.includes('warehouse') || lastUserMessage.includes('storage')) {
+              responseText = "The map currently shows several warehouse complexes, including:\n\n- Southport Logistics Park\n- Mockingbird Industrial Center\n- Valwood Industrial Park\n- Commercial warehousing at Dallas Trade Center\n\nThese facilities offer various warehouse capabilities from simple storage to sophisticated distribution operations.";
+            } else if (lastUserMessage.includes('manufacturing') || lastUserMessage.includes('production')) {
+              responseText = "For manufacturing facilities, the current map shows:\n\n- Pinnacle Industrial Center\n- GSW Industrial Park (technology manufacturing)\n- Richardson Tech Park (technology manufacturing)\n- Garland Industrial Estate (manufacturing complex)\n- East Dallas Manufacturing (specialized manufacturing)\n\nThese locations support various types of production from general manufacturing to specialized technology production.";
+            } else {
+              responseText = "The industrial properties displayed on the map include a mix of:\n\n- Logistics facilities (like Dallas Logistics Hub)\n- Warehouse complexes (Southport Logistics Park, Valwood Industrial Park)\n- Manufacturing facilities (Pinnacle Industrial Center, Garland Industrial Estate)\n- Distribution centers (DFW Commerce Center, Redbird Distribution Center)\n\nThese properties are distributed throughout the Dallas area, with concentrations in both the northern and southern industrial districts.";
+            }
+          } else {
+            responseText = `Based on what's currently displayed on the map, I can see ${displayedLocationTypes.join(' and ')} locations. Could you be more specific about what you're looking for? I can provide details about specific features or areas.`;
+          }
+        }
+        // Check if this is a follow-up question about what's on the map
+        else if (isFollowUp && lastUserMessage.length < 60 && !lastUserMessage.includes('hello') && !lastUserMessage.includes('hi') && displayedLocationTypes.length > 0) {
+          // Build response based on what's currently on the map
+          const locationDesc = displayedLocationTypes.map(type => {
+            switch(type) {
+              case 'fedex': return "FedEx locations offering various shipping and business services";
+              case 'starbucks': return "Starbucks cafes with different amenities across Dallas";
+              case 'property': return "industrial properties including warehouses and distribution centers";
+              default: return type;
+            }
+          }).join(' and ');
+          
+          responseText = `I'm looking at the map which is currently showing ${locationDesc}. `;
+          
+          if (hasQuestion) {
+            responseText += "Based on what I can see, ";
+            
+            if (hasFedEx && displayedLocationTypes.includes('fedex')) {
+              responseText += "the FedEx locations are distributed throughout Dallas, with concentrations in the business districts and near major highways for easy access. ";
+            }
+            
+            if (hasStarbucks && displayedLocationTypes.includes('starbucks')) {
+              responseText += "the Starbucks cafes are strategically placed in high-traffic areas, business centers, and residential neighborhoods throughout Dallas. Many offer drive-thru service or outdoor seating. ";
+            }
+            
+            if (hasProperty && displayedLocationTypes.includes('property')) {
+              responseText += "the industrial properties are mainly concentrated in designated industrial zones, with larger complexes in South Dallas near transportation hubs. ";
+            }
+            
+            responseText += "\n\nWould you like me to focus on a specific area or show relationships between different location types?";
+          } else {
+            responseText += "Is there something specific you'd like to know about these locations? I can help with information about their features, relationships between different location types, or focus on a particular area of Dallas.";
+          }
         } else if (lastUserMessage.includes('hello') || lastUserMessage.includes('hi')) {
           // Include suggested questions in the greeting
           const suggestions = generateSuggestedQuestions();
@@ -347,3 +440,13 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
   }
 };
 
+// Helper function to extract location types from context message
+function extractLocationsFromContext(contextMessage: string): string[] {
+  if (contextMessage.includes('Currently displayed on the map:')) {
+    const match = contextMessage.match(/Currently displayed on the map: (.*?)\./) || [];
+    if (match[1]) {
+      return match[1].split(', ').map(loc => loc.trim());
+    }
+  }
+  return [];
+}

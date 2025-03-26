@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -7,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
+import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
 export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
 
@@ -15,6 +17,7 @@ export interface LocationQuery {
   target?: LocationSourceTarget;
   radius: number;
   isDallasQuery?: boolean; // Added field to track if this is a Dallas area query
+  queryText?: string; // Store the original query text
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
@@ -150,23 +153,14 @@ function isLocationQuery(message: string): LocationQuery | null {
   // Check for distance/proximity terms
   const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
   
-  // Special case for Dallas property queries
-  if (hasProperty && isDallasQuery && isShowingRequest) {
-    console.log("Detected request for properties in Dallas area");
-    return { 
-      source: 'property' as LocationSourceTarget, 
-      radius,
-      isDallasQuery: true 
-    };
-  }
-  
   // If explicitly asking for all Starbucks locations
   if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
     console.log("Detected request for Starbucks locations");
     return { 
       source: 'starbucks' as LocationSourceTarget, 
       radius,
-      isDallasQuery 
+      isDallasQuery,
+      queryText: message
     };
   }
   
@@ -176,7 +170,19 @@ function isLocationQuery(message: string): LocationQuery | null {
     return { 
       source: 'fedex' as LocationSourceTarget, 
       radius,
-      isDallasQuery 
+      isDallasQuery,
+      queryText: message
+    };
+  }
+  
+  // Special case for Dallas property queries
+  if (hasProperty && isDallasQuery && isShowingRequest) {
+    console.log("Detected request for properties in Dallas area");
+    return { 
+      source: 'property' as LocationSourceTarget, 
+      radius,
+      isDallasQuery: true,
+      queryText: message 
     };
   }
   
@@ -186,7 +192,8 @@ function isLocationQuery(message: string): LocationQuery | null {
     return { 
       source: 'property' as LocationSourceTarget, 
       radius,
-      isDallasQuery 
+      isDallasQuery,
+      queryText: message
     };
   }
   
@@ -202,7 +209,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'starbucks' as LocationSourceTarget,
           target: 'property' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       } else {
         console.log("Detected request for properties near Starbucks locations");
@@ -210,7 +218,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'property' as LocationSourceTarget,
           target: 'starbucks' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       }
     }
@@ -225,7 +234,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'starbucks' as LocationSourceTarget,
           target: 'fedex' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       } else {
         console.log("Detected request for FedEx locations near Starbucks");
@@ -233,7 +243,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'fedex' as LocationSourceTarget,
           target: 'starbucks' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       }
     }
@@ -249,7 +260,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'fedex' as LocationSourceTarget,
           target: 'property' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       } else {
         console.log("Detected request for properties near FedEx locations");
@@ -257,7 +269,8 @@ function isLocationQuery(message: string): LocationQuery | null {
           source: 'property' as LocationSourceTarget,
           target: 'fedex' as LocationSourceTarget,
           radius,
-          isDallasQuery
+          isDallasQuery,
+          queryText: message
         };
       }
     }
@@ -285,7 +298,8 @@ function isLocationQuery(message: string): LocationQuery | null {
       source: firstMentioned as LocationSourceTarget,
       target: secondMentioned as LocationSourceTarget,
       radius,
-      isDallasQuery
+      isDallasQuery,
+      queryText: message
     };
   }
   
@@ -294,7 +308,8 @@ function isLocationQuery(message: string): LocationQuery | null {
     return { 
       source: 'starbucks' as LocationSourceTarget, 
       radius,
-      isDallasQuery
+      isDallasQuery,
+      queryText: message
     };
   }
   
@@ -303,7 +318,8 @@ function isLocationQuery(message: string): LocationQuery | null {
     return { 
       source: 'fedex' as LocationSourceTarget, 
       radius,
-      isDallasQuery
+      isDallasQuery,
+      queryText: message
     };
   }
   
@@ -312,12 +328,22 @@ function isLocationQuery(message: string): LocationQuery | null {
     return { 
       source: 'property' as LocationSourceTarget, 
       radius,
-      isDallasQuery
+      isDallasQuery,
+      queryText: message
     };
   }
   
   // If it's not a location query we recognize
   return null;
+}
+
+// Get currently displayed map locations
+const API_QUERY_EVENT = 'api-query-event';
+
+export function emitApiQueryEvent(query: string) {
+  console.log("Emitting API query event:", query);
+  const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
+  window.dispatchEvent(event);
 }
 
 interface ChatbotProps {
@@ -330,6 +356,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [mapContext, setMapContext] = useState<{
+    visibleLocations?: LocationSourceTarget[];
+    lastQuery?: LocationQuery;
+  }>({});
   
   // Welcome message
   useEffect(() => {
@@ -340,6 +370,33 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
+  }, []);
+  
+  // Listen for updates from the map about what's currently displayed
+  useEffect(() => {
+    const handleMapUpdate = (e: CustomEvent<any>) => {
+      if (e.detail && e.detail.visibleLocations) {
+        setMapContext(prev => ({
+          ...prev,
+          visibleLocations: e.detail.visibleLocations
+        }));
+      }
+      
+      if (e.detail && e.detail.query) {
+        setMapContext(prev => ({
+          ...prev,
+          lastQuery: e.detail.query
+        }));
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('map-context-update', handleMapUpdate as EventListener);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('map-context-update', handleMapUpdate as EventListener);
+    };
   }, []);
   
   // Auto-scroll to the latest message
@@ -380,6 +437,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       text: locationQuery ? 
         (locationQuery.source === 'fedex' ? 
           "Searching for FedEx locations..." : 
+          locationQuery.source === 'starbucks' ?
+          "Searching for Starbucks locations..." :
           "Searching for industrial properties...") :
         "Processing your request...",
       sender: 'bot',
@@ -402,6 +461,21 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       content: input
     });
     
+    // Add context about what's currently displayed on the map
+    if (mapContext.visibleLocations && mapContext.visibleLocations.length > 0) {
+      messageHistory.push({
+        role: 'system',
+        content: `Currently displayed on the map: ${mapContext.visibleLocations.join(', ')} locations.`
+      });
+    }
+    
+    if (mapContext.lastQuery) {
+      messageHistory.push({
+        role: 'system',
+        content: `The last user query that affected the map was about ${mapContext.lastQuery.source} ${mapContext.lastQuery.target ? `near ${mapContext.lastQuery.target}` : ''} with radius ${mapContext.lastQuery.radius} miles.`
+      });
+    }
+    
     try {
       // If this is a location query, trigger the map update event
       if (locationQuery) {
@@ -418,6 +492,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         // Explicitly dispatch event from window
         window.dispatchEvent(event);
         console.log("Location query event dispatched");
+      } else {
+        // For non-location queries that still need map data
+        if (input.includes("?") || 
+            input.toLowerCase().includes("how many") || 
+            input.toLowerCase().includes("which ones") ||
+            input.toLowerCase().includes("tell me about")) {
+          emitApiQueryEvent(input);
+        }
       }
       
       // Get AI response
@@ -465,7 +547,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     // Clear input and reset processing state
     setInput('');
     setIsProcessing(false);
-  }, [input, messages, isProcessing, toast]);
+  }, [input, messages, isProcessing, toast, mapContext]);
 
   // Handle Enter key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
