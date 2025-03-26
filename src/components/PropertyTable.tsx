@@ -3,13 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LocationWithCoordinates } from '@/utils/mapUtils';
 import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
+import { MAP_RESULTS_UPDATE_EVENT } from './Map';
 
 interface PropertyTableProps {
   className?: string;
 }
-
-// Make sure to use exactly the same constant name as in Map.tsx
-import { MAP_RESULTS_UPDATE_EVENT } from './Map';
 
 const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
   const [properties, setProperties] = useState<LocationWithCoordinates[]>([]);
