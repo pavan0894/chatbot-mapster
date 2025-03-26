@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -615,4 +616,220 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // For queries relating to two different location types
     if (targetData) {
-      console.log(`Finding ${query.source} locations within ${query.radius} miles of ${query
+      console.log(`Finding ${query.source} locations within ${query.radius} miles of ${query.target} locations`);
+      
+      const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
+        sourceData,
+        targetData,
+        query.radius
+      );
+      
+      if (connections.length === 0) {
+        console.log("No locations found within the radius");
+        emitResultsUpdate([]);
+        emitMapContextUpdate({
+          visibleLocations: [],
+          query
+        });
+        return;
+      }
+      
+      const getMarkerColors = (locationType: string) => {
+        switch(locationType) {
+          case 'fedex':
+            return { bg: '#4D148C', border: '#FF6600' };
+          case 'starbucks':
+            return { bg: '#00704A', border: '#ffffff' };
+          default:
+            return { bg: '#333', border: '#fff' };
+        }
+      };
+      
+      const sourceColors = getMarkerColors(query.source);
+      const targetColors = query.target ? getMarkerColors(query.target) : { bg: '#333', border: '#fff' };
+      
+      // Only add the locations that match our filter criteria
+      addFilteredLocations(sourceLocations, query.source, sourceColors.bg, sourceColors.border);
+      
+      if (targetLocations.length > 0 && query.target) {
+        addFilteredLocations(targetLocations, query.target, targetColors.bg, targetColors.border);
+      }
+      
+      addConnectionLines(connections);
+      
+      // Fit the map to show only the matching locations
+      fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
+        return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+          ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
+          : [0, 0] as [number, number];
+      }));
+      
+      // Only emit the filtered results
+      emitResultsUpdate([...sourceLocations, ...targetLocations]);
+      emitMapContextUpdate({
+        visibleLocations: visibleLocationTypes,
+        query,
+        properties: [...sourceLocations, ...targetLocations]
+      });
+    }
+  };
+
+  const handleComplexQuery = (event: CustomEvent<LocationQuery>) => {
+    const query = event.detail;
+    console.log("Complex query received in Map component:", query);
+    
+    if (!map.current || !query.complexQuery) {
+      console.error("Map not initialized or invalid complex query");
+      return;
+    }
+    
+    // Clear previous markers and results
+    clearAllMarkers();
+    clearFilteredLocations();
+    
+    // Reset visible location types
+    const newVisibleTypes: string[] = [];
+    setVisibleLocationTypes(newVisibleTypes);
+    
+    const { includeType, excludeType, includeRadius, excludeRadius } = query.complexQuery;
+    
+    console.log(`Processing complex spatial query: properties within ${includeRadius} miles of ${includeType} and ${excludeRadius} miles away from ${excludeType}`);
+    
+    // Load the required location data
+    let includeLocations: LocationWithCoordinates[] = [];
+    let excludeLocations: LocationWithCoordinates[] = [];
+    
+    // Get the include locations data
+    if (includeType === 'fedex') {
+      includeLocations = loadFedExLocations();
+      newVisibleTypes.push('fedex');
+    } else if (includeType === 'starbucks') {
+      includeLocations = STARBUCKS_LOCATIONS;
+      newVisibleTypes.push('starbucks');
+    }
+    
+    // Get the exclude locations data
+    if (excludeType === 'fedex') {
+      excludeLocations = loadFedExLocations();
+      newVisibleTypes.push('fedex');
+    } else if (excludeType === 'starbucks') {
+      excludeLocations = STARBUCKS_LOCATIONS;
+      newVisibleTypes.push('starbucks');
+    }
+    
+    // Properties are always the main entity we're filtering
+    const properties = INDUSTRIAL_PROPERTIES;
+    
+    // Display the include and exclude location markers
+    const getMarkerColors = (locationType: string) => {
+      switch(locationType) {
+        case 'fedex':
+          return { bg: '#4D148C', border: '#FF6600' };
+        case 'starbucks':
+          return { bg: '#00704A', border: '#ffffff' };
+        default:
+          return { bg: '#333', border: '#fff' };
+      }
+    };
+    
+    const includeColors = getMarkerColors(includeType);
+    const excludeColors = getMarkerColors(excludeType);
+    
+    // Add the include location markers
+    addFilteredLocations(includeLocations, includeType, includeColors.bg, includeColors.border);
+    
+    // Add the exclude location markers
+    addFilteredLocations(excludeLocations, excludeType, excludeColors.bg, excludeColors.border);
+    
+    setVisibleLocationTypes(newVisibleTypes);
+    
+    // Find properties that meet the complex criteria
+    const withinIncludeRadius = findLocationsWithinRadius(
+      properties,
+      includeLocations,
+      includeRadius
+    ).sourceLocations;
+    
+    // For exclude condition, we first find all properties within the exclude radius,
+    // then we'll remove them from our results
+    const withinExcludeRadius = findLocationsWithinRadius(
+      properties,
+      excludeLocations,
+      excludeRadius
+    ).sourceLocations;
+    
+    // Get properties that are within include radius but not within exclude radius
+    const filteredProperties = withinIncludeRadius.filter(prop => 
+      !withinExcludeRadius.some(excluded => 
+        excluded.name === prop.name
+      )
+    );
+    
+    // Display the filtered properties ONLY if there are any matching the criteria
+    if (filteredProperties.length > 0) {
+      console.log(`Found ${filteredProperties.length} properties that match complex criteria`);
+      
+      // Add property markers for the filtered properties
+      addFilteredLocations(filteredProperties, 'property', '#333', '#fff');
+      newVisibleTypes.push('property');
+      setVisibleLocationTypes([...newVisibleTypes, 'property']);
+      
+      // Find connections between properties and include locations
+      const connections = findLocationsWithinRadius(
+        filteredProperties,
+        includeLocations,
+        includeRadius
+      ).connections;
+      
+      // Add connection lines
+      addConnectionLines(connections);
+      
+      // Fit map to show all relevant points
+      const allRelevantLocations = [
+        ...filteredProperties,
+        ...includeLocations,
+        ...excludeLocations
+      ];
+      
+      fitMapToLocations(allRelevantLocations.map(loc => {
+        return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+          ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
+          : [0, 0] as [number, number];
+      }));
+      
+      // Update results
+      emitResultsUpdate(filteredProperties);
+      emitMapContextUpdate({
+        visibleLocations: [...newVisibleTypes, 'property'],
+        query,
+        properties: filteredProperties
+      });
+    } else {
+      console.log("No properties found that match complex criteria");
+      emitResultsUpdate([]);
+      emitMapContextUpdate({
+        visibleLocations: newVisibleTypes,
+        query
+      });
+    }
+  };
+
+  useEffect(() => {
+    console.log("Setting up Map event listeners");
+    
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+    
+    return () => {
+      console.log("Removing Map event listeners");
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+    };
+  }, []);
+
+  return (
+    <div ref={mapContainer} className={`w-full h-full ${className}`}></div>
+  );
+};
+
+export default Map;
