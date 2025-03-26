@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
@@ -31,32 +30,27 @@ export const LOCATION_QUERY_EVENT = 'location-query';
 export const API_QUERY_EVENT = 'api-query-event';
 export const COMPLEX_QUERY_EVENT = 'complex-query-event'; // New event for complex spatial queries
 
-// Emit a location query event
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
   const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
   window.dispatchEvent(event);
 }
 
-// Emit complex query event
 export function emitComplexQueryEvent(query: LocationQuery) {
   console.log("Emitting complex query event:", query);
   const event = new CustomEvent(COMPLEX_QUERY_EVENT, { detail: query });
   window.dispatchEvent(event);
 }
 
-// Get currently displayed map locations
 export function emitApiQueryEvent(query: string) {
   console.log("Emitting API query event:", query);
   const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
   window.dispatchEvent(event);
 }
 
-// Enhanced function to determine if a message is a location query with better Dallas area detection
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
   
-  // Check for complex spatial query first
   const complexQuery = parseComplexSpatialQuery(message);
   if (complexQuery) {
     console.log("Detected complex spatial query:", complexQuery);
@@ -74,7 +68,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // Dallas area detection patterns
   const dallasPatterns = [
     /\bdallas\b/i,
     /\bdallas\s+area\b/i,
@@ -86,23 +79,18 @@ function isLocationQuery(message: string): LocationQuery | null {
     /\bdallas-fort\s+worth\b/i
   ];
   
-  // Check if message mentions Dallas area
   const isDallasQuery = dallasPatterns.some(pattern => pattern.test(message));
   
-  // More comprehensive FedEx detection patterns
   const fedExPatterns = [
-    // Direct mentions
     /\bfedex\b/i, 
     /\bfed\s*ex\b/i, 
     /\bfederal\s*express\b/i,
     
-    // Service-related
     /shipping\s+(center|location|service)/i,
     /delivery\s+service/i,
     /package\s+(service|delivery)/i,
     /express\s+(shipping|delivery)/i,
     
-    // Query patterns
     /where\s+(?:are|is)\s+(?:the\s+)?fedex/i,
     /show\s+(?:me\s+)?(?:all\s+)?fedex/i,
     /find\s+(?:me\s+)?(?:all\s+)?fedex/i,
@@ -114,22 +102,18 @@ function isLocationQuery(message: string): LocationQuery | null {
     /fedex.+\?/i
   ];
   
-  // Starbucks detection patterns
   const starbucksPatterns = [
-    // Direct mentions
     /\bstarbucks\b/i,
     /\bstarbuck's\b/i,
     /\bcoffee\s+shop[s]?\b/i,
     /\bcafe[s]?\b/i,
     
-    // Service-related
     /coffee/i,
     /latte/i,
     /espresso/i,
     /cappuccino/i,
     /frappuccino/i,
     
-    // Query patterns
     /where\s+(?:are|is)\s+(?:the\s+)?starbucks/i,
     /show\s+(?:me\s+)?(?:all\s+)?starbucks/i,
     /find\s+(?:me\s+)?(?:all\s+)?starbucks/i,
@@ -142,7 +126,6 @@ function isLocationQuery(message: string): LocationQuery | null {
   ];
   
   const propertyPatterns = [
-    // Direct mentions
     /\bproperty\b/i, 
     /\bproperties\b/i, 
     /\bindustrial\b/i,
@@ -154,14 +137,12 @@ function isLocationQuery(message: string): LocationQuery | null {
     /\bindustrial\s+park\b/i,
     /\bbusiness\s+park\b/i,
     
-    // Query patterns
     /where\s+(?:are|is)\s+(?:the\s+)?(?:industrial\s+)?properties/i,
     /show\s+(?:me\s+)?(?:all\s+)?(?:industrial\s+)?properties/i,
     /about\s+(?:industrial\s+)?properties/i,
     /properties.+\?/i
   ];
   
-  // Check for show/display/where keywords that indicate a user wants to see something
   const showPatterns = [
     /\bshow\b/i,
     /\bdisplay\b/i,
@@ -170,31 +151,22 @@ function isLocationQuery(message: string): LocationQuery | null {
     /\blocate\b/i
   ];
   
-  const isShowingRequest = showPatterns.some(pattern => pattern.test(message));
-  
-  // Check for FedEx mentions
   const hasFedEx = fedExPatterns.some(pattern => pattern.test(message));
   
-  // Check for Starbucks mentions
   const hasStarbucks = starbucksPatterns.some(pattern => pattern.test(message));
   
-  // Check for property mentions
   const hasProperty = propertyPatterns.some(pattern => pattern.test(message));
   
-  // Determine radius (default to 5 miles)
   let radius = 5;
   const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
   if (radiusMatch) {
     radius = parseInt(radiusMatch[1], 10);
   }
   
-  // Check for questions about "all" locations
   const askingForAll = /show\s+(?:me\s+)?all|where\s+(?:are|is)\s+all|find\s+all|display\s+all|list\s+all/i.test(message);
   
-  // Check for distance/proximity terms
   const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
   
-  // If explicitly asking for all Starbucks locations
   if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
     console.log("Detected request for Starbucks locations");
     return { 
@@ -205,7 +177,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If explicitly asking for all FedEx locations
   if (hasFedEx && (askingForAll || !hasProximity) && !hasProperty && !hasStarbucks) {
     console.log("Detected request for FedEx locations");
     return { 
@@ -216,7 +187,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // Special case for Dallas property queries
   if (hasProperty && isDallasQuery && isShowingRequest) {
     console.log("Detected request for properties in Dallas area");
     return { 
@@ -227,7 +197,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If explicitly asking for all properties (but not Dallas-specific)
   if (hasProperty && (askingForAll || !hasProximity) && !hasFedEx && !hasStarbucks) {
     console.log("Detected request for property locations");
     return { 
@@ -238,9 +207,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // Handle proximity queries with multiple location types
   if (hasProximity) {
-    // Starbucks near properties
     if (hasStarbucks && hasProperty && !hasFedEx) {
       const starbucksNearProperty = /starbucks\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message);
       
@@ -265,7 +232,6 @@ function isLocationQuery(message: string): LocationQuery | null {
       }
     }
     
-    // Starbucks near FedEx
     if (hasStarbucks && hasFedEx && !hasProperty) {
       const starbucksNearFedEx = /starbucks\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex/i.test(message);
       
@@ -290,7 +256,6 @@ function isLocationQuery(message: string): LocationQuery | null {
       }
     }
     
-    // FedEx near properties
     if (hasFedEx && hasProperty && !hasStarbucks) {
       const fedExNearProperty = /fedex\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message) ||
                               /(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit).*fedex/i.test(message);
@@ -317,7 +282,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     }
   }
   
-  // If all three are mentioned, prioritize the first mentioned
   if (hasStarbucks && hasFedEx && hasProperty) {
     const firstMentioned = 
       message.indexOf('starbucks') < message.indexOf('fedex') && message.indexOf('starbucks') < message.indexOf('propert') ? 'starbucks' :
@@ -344,7 +308,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If no strong relationship is detected but Starbucks is mentioned
   if (hasStarbucks) {
     return { 
       source: 'starbucks' as LocationSourceTarget, 
@@ -354,7 +317,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If no strong relationship is detected but FedEx is mentioned
   if (hasFedEx) {
     return { 
       source: 'fedex' as LocationSourceTarget, 
@@ -364,7 +326,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If no strong relationship is detected but property is mentioned
   if (hasProperty) {
     return { 
       source: 'property' as LocationSourceTarget, 
@@ -374,7 +335,6 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If it's not a location query we recognize
   return null;
 }
 
@@ -392,7 +352,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     visibleLocations?: LocationSourceTarget[];
     lastQuery?: LocationQuery;
   }>({});
-  
+
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
@@ -402,7 +362,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     };
     setMessages([welcomeMessage]);
   }, []);
-  
+
   useEffect(() => {
     const handleMapUpdate = (e: CustomEvent<any>) => {
       if (e.detail && e.detail.visibleLocations) {
@@ -426,7 +386,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       window.removeEventListener('map-context-update', handleMapUpdate as EventListener);
     };
   }, []);
-  
+
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -503,10 +463,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
         
         if (locationQuery.complexQuery) {
-          // If it's a complex spatial query, emit the complex query event
           emitComplexQueryEvent(locationQuery);
         } else {
-          // For simple location queries, use the existing event
           const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
             detail: locationQuery,
             bubbles: true,
@@ -582,6 +540,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
 
   return (
     <Card className={cn("w-full h-full rounded-none flex flex-col", className)}>
+      <CardHeader className="py-3 px-4 border-b">
+        <CardTitle className="text-lg">Survey Agent</CardTitle>
+      </CardHeader>
       <CardContent className="flex flex-col h-full p-0">
         <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
           <div className="flex flex-col space-y-4">
