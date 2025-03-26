@@ -259,7 +259,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.className = 'fedex-marker';
       // Create a container with FedEx branding
       el.style.position = 'relative';
-      el.style.width = '80px';
+      el.style.width = '90px'; // Increased width to accommodate full text
       el.style.height = '35px';
       el.style.cursor = 'pointer';
       
@@ -288,19 +288,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       circle.style.justifyContent = 'center';
       circle.appendChild(icon);
       
-      // Create the FedEx text label
+      // Create the FedEx text label - Updated to include full "FedEx" text
       const label = document.createElement('div');
       label.style.position = 'absolute';
       label.style.left = '32px';
       label.style.top = '0';
       label.style.fontFamily = 'Arial, sans-serif';
       label.style.fontWeight = 'bold';
-      label.style.fontSize = '16px';
-      label.style.padding = '2px';
+      label.style.fontSize = '14px';
+      label.style.padding = '4px 6px';
       label.style.color = '#4D148C'; // FedEx purple
       label.style.backgroundColor = 'white';
       label.style.borderRadius = '4px';
       label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
+      label.style.whiteSpace = 'nowrap';
       label.textContent = 'FedEx';
       
       // Add components to marker element
@@ -315,7 +316,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           </div>
         `);
       
-      const marker = new mapboxgl.Marker(el)
+      // Set marker options to make it stay in place (not move with scroll)
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'bottom',
+        offset: [0, 0],
+        pitchAlignment: 'map', // Keep aligned with the map plane
+        rotationAlignment: 'map' // Keep aligned with the map
+      })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
         .addTo(map.current);
@@ -428,7 +436,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (locationType === 'fedex') {
         // Create a container with FedEx branding
         el.style.position = 'relative';
-        el.style.width = '80px';
+        el.style.width = '90px'; // Increased width for full text
         el.style.height = '35px';
         el.style.cursor = 'pointer';
         el.style.zIndex = '10';
@@ -458,25 +466,27 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         `;
         circle.appendChild(icon);
         
-        // Create the FedEx text label
+        // Create the FedEx text label - Updated with full "FedEx" text
         const label = document.createElement('div');
         label.style.position = 'absolute';
         label.style.left = '32px';
         label.style.top = '0';
         label.style.fontFamily = 'Arial, sans-serif';
         label.style.fontWeight = 'bold';
-        label.style.fontSize = '16px';
-        label.style.padding = '2px';
+        label.style.fontSize = '14px';
+        label.style.padding = '4px 6px';
         label.style.color = '#4D148C'; // FedEx purple
         label.style.backgroundColor = 'white';
         label.style.borderRadius = '4px';
         label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
+        label.style.whiteSpace = 'nowrap';
         label.textContent = 'FedEx';
         
         // Add components to marker element
         el.appendChild(circle);
         el.appendChild(label);
       } else {
+        // Property marker styling
         el.style.width = '24px';
         el.style.height = '34px';
         el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
@@ -502,7 +512,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         ? [location.coordinates[0], location.coordinates[1]] as [number, number]
         : [0, 0] as [number, number];
       
-      const marker = new mapboxgl.Marker(el)
+      // Use marker options to make it stay in place
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'bottom',
+        offset: [0, 0],
+        pitchAlignment: 'map', // Keep aligned with the map plane
+        rotationAlignment: 'map' // Keep aligned with the map
+      })
         .setLngLat(coordinates)
         .setPopup(popup)
         .addTo(map.current);
