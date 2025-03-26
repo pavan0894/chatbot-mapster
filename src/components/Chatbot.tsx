@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -167,6 +168,9 @@ function isLocationQuery(message: string): LocationQuery | null {
   
   const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
   
+  // Check if this is a showing request using the showPatterns
+  const isShowRequest = showPatterns.some(pattern => pattern.test(message));
+  
   if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
     console.log("Detected request for Starbucks locations");
     return { 
@@ -187,7 +191,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  if (hasProperty && isDallasQuery && isShowingRequest) {
+  if (hasProperty && isDallasQuery && isShowRequest) {
     console.log("Detected request for properties in Dallas area");
     return { 
       source: 'property' as LocationSourceTarget, 
