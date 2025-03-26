@@ -254,61 +254,28 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
-      el.style.width = '30px';
-      el.style.height = '30px';
+      el.style.width = '24px';
+      el.style.height = '24px';
       el.style.borderRadius = '50%';
       el.style.backgroundColor = '#4D148C';
       el.style.border = '2px solid #FF6600';
       el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
       el.style.cursor = 'pointer';
-      el.style.display = 'flex';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
-      el.style.position = 'relative';
       
-      const icon = document.createElement('div');
-      icon.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M19 8.5L12 14L5 8.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      `;
-      el.appendChild(icon);
-      
-      const labelContainer = document.createElement('div');
-      labelContainer.style.position = 'absolute';
-      labelContainer.style.top = '-30px';
-      labelContainer.style.left = '50%';
-      labelContainer.style.transform = 'translateX(-50%)';
-      labelContainer.style.pointerEvents = 'none';
-      
-      const label = document.createElement('div');
-      label.style.fontFamily = 'Arial, sans-serif';
-      label.style.fontWeight = 'bold';
-      label.style.fontSize = '12px';
-      label.style.padding = '2px 4px';
-      label.style.color = '#4D148C';
-      label.style.backgroundColor = 'white';
-      label.style.borderRadius = '4px';
-      label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
-      label.style.whiteSpace = 'nowrap';
-      label.textContent = 'FedEx';
-      
-      labelContainer.appendChild(label);
-      el.appendChild(labelContainer);
-      
-      const popup = new mapboxgl.Popup({ offset: [0, -15] })
-        .setHTML(`
-          <div style="padding: 5px;">
-            <h3 style="font-weight: bold; margin-bottom: 5px; color: #4D148C;">${location.name}</h3>
-            <p style="margin: 0;">${location.description}</p>
-          </div>
-        `);
+      const popup = new mapboxgl.Popup({ 
+        offset: [0, 0],
+        closeButton: false,
+        closeOnClick: true
+      }).setHTML(`
+        <div style="padding: 8px; max-width: 200px;">
+          <h3 style="font-weight: bold; margin-bottom: 5px; color: #4D148C;">${location.name}</h3>
+          <p style="margin: 0;">${location.description}</p>
+        </div>
+      `);
       
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: 'center',
-        offset: [0, 0]
+        anchor: 'center'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
@@ -430,49 +397,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (locationType === 'fedex') {
         el = document.createElement('div');
         el.className = `${locationType}-marker-filtered`;
-        el.style.width = '30px';
-        el.style.height = '30px';
+        el.style.width = '24px';
+        el.style.height = '24px';
         el.style.borderRadius = '50%';
         el.style.backgroundColor = bgColor;
         el.style.border = `2px solid ${borderColor}`;
-        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
         el.style.cursor = 'pointer';
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        el.style.position = 'relative';
-        el.style.zIndex = '10';
-        
-        const icon = document.createElement('div');
-        icon.innerHTML = `
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 8.5L12 14L5 8.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        `;
-        el.appendChild(icon);
-        
-        const labelContainer = document.createElement('div');
-        labelContainer.style.position = 'absolute';
-        labelContainer.style.top = '-30px';
-        labelContainer.style.left = '50%';
-        labelContainer.style.transform = 'translateX(-50%)';
-        labelContainer.style.pointerEvents = 'none';
-        
-        const label = document.createElement('div');
-        label.style.fontFamily = 'Arial, sans-serif';
-        label.style.fontWeight = 'bold';
-        label.style.fontSize = '12px';
-        label.style.padding = '2px 4px';
-        label.style.color = '#4D148C';
-        label.style.backgroundColor = 'white';
-        label.style.borderRadius = '4px';
-        label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
-        label.style.whiteSpace = 'nowrap';
-        label.textContent = 'FedEx';
-        
-        labelContainer.appendChild(label);
-        el.appendChild(labelContainer);
       } else {
         el = document.createElement('div');
         el.className = `${locationType}-marker-filtered`;
@@ -482,14 +413,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.backgroundSize = 'contain';
         el.style.backgroundRepeat = 'no-repeat';
         el.style.cursor = 'pointer';
-        el.style.zIndex = '10';
         el.style.filter = 'drop-shadow(0 0 6px rgba(255,102,0,0.8))';
       }
       
       const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -25] : [0, -15]
+        offset: locationType === 'property' ? [0, -15] : [0, 0],
+        closeButton: false,
+        closeOnClick: true
       }).setHTML(`
-        <div style="padding: 5px;">
+        <div style="padding: 8px; max-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 5px; ${
             locationType === 'fedex' ? 'color: #4D148C;' : ''
           }">${location.name}</h3>
@@ -497,16 +429,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         </div>
       `);
       
-      const coordinates = Array.isArray(location.coordinates) && location.coordinates.length >= 2 
-        ? [location.coordinates[0], location.coordinates[1]] as [number, number]
-        : [0, 0] as [number, number];
-      
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: locationType === 'fedex' ? 'center' : 'bottom',
-        offset: [0, 0]
+        anchor: locationType === 'property' ? 'bottom' : 'center'
       })
-        .setLngLat(coordinates)
+        .setLngLat(Array.isArray(location.coordinates) && location.coordinates.length >= 2 
+          ? [location.coordinates[0], location.coordinates[1]] as [number, number]
+          : [0, 0] as [number, number])
         .setPopup(popup)
         .addTo(map.current);
       
