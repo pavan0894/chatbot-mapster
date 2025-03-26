@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT, COMPLEX_QUERY_EVENT } from './Chatbot';
-import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers } from '@/utils/mapUtils';
+import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT, COMPLEX_QUERY_EVENT, MULTI_TARGET_QUERY_EVENT } from './Chatbot';
+import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers, findPropertiesWithMultiTargetProximity } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
@@ -828,7 +828,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addFilteredLocations(filteredProperties, 'property', '#E53935', '#fff');
       newVisibleTypes.push('property');
-      setVisibleLocationTypes([...newVisibleTypes, 'property']);
       
       const connections = findLocationsWithinRadius(
         filteredProperties,
@@ -866,16 +865,128 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
   };
 
+  const handleMultiTargetQuery = (event: CustomEvent<LocationQuery>) => {
+    const query = event.detail;
+    console.log("Multi-target query received in Map component:", query);
+
+    if (!map.current || !query.multiTargetQuery) {
+      console.error("Map not initialized or invalid multi-target query");
+      return;
+    }
+
+    clearAllMarkers();
+    clearFilteredLocations();
+
+    const newVisibleTypes: string[] = [];
+    setVisibleLocationTypes(newVisibleTypes);
+    setCurrentQuery(query);
+
+    const { targetTypes } = query.multiTargetQuery;
+    console.log(`Processing multi-target query: properties near ${targetTypes.map(t => `${t.type} (${t.radius} miles)`).join(' and ')}`);
+
+    // Prepare target locations data
+    const targetData = targetTypes.map(target => {
+      let locations: LocationWithCoordinates[] = [];
+      
+      if (target.type === 'fedex') {
+        locations = loadFedExLocations();
+        newVisibleTypes.push('fedex');
+      } else if (target.type === 'starbucks') {
+        locations = STARBUCKS_LOCATIONS;
+        newVisibleTypes.push('starbucks');
+      }
+      
+      return {
+        type: target.type,
+        locations,
+        radius: target.radius
+      };
+    });
+
+    // Add all target locations to the map first
+    targetData.forEach(data => {
+      const { type, locations } = data;
+      const colors = getMarkerColors(type);
+      addFilteredLocations(locations, type, colors.bg, colors.border);
+    });
+
+    // Find properties that meet all proximity criteria
+    const result = findPropertiesWithMultiTargetProximity(
+      INDUSTRIAL_PROPERTIES,
+      targetData
+    );
+
+    if (result.resultProperties.length > 0) {
+      console.log(`Found ${result.resultProperties.length} properties matching all proximity criteria`);
+      
+      // Add the matching properties to the map
+      addFilteredLocations(result.resultProperties, 'property', '#E53935', '#fff');
+      newVisibleTypes.push('property');
+      
+      // Add connection lines
+      const connections = result.connections.map(conn => ({
+        source: conn.source,
+        target: conn.target,
+        distance: conn.distance
+      }));
+      
+      addConnectionLines(connections);
+      
+      // Fit map to show all points
+      const allLocations = [
+        ...result.resultProperties,
+        ...targetData.flatMap(td => td.locations)
+      ];
+      
+      fitMapToLocations(allLocations.map(loc => {
+        return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+          ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
+          : [0, 0] as [number, number];
+      }));
+      
+      // Emit results update
+      emitResultsUpdate(result.resultProperties);
+      emitMapContextUpdate({
+        visibleLocations: [...newVisibleTypes, 'property'],
+        query,
+        properties: result.resultProperties
+      });
+      
+      setVisibleLocationTypes([...newVisibleTypes, 'property']);
+    } else {
+      console.log("No properties found that match all proximity criteria");
+      emitResultsUpdate([]);
+      emitMapContextUpdate({
+        visibleLocations: newVisibleTypes,
+        query
+      });
+      setVisibleLocationTypes(newVisibleTypes);
+    }
+  };
+
+  const getMarkerColors = (locationType: string) => {
+    switch(locationType) {
+      case 'fedex':
+        return { bg: '#4D148C', border: '#FF6600' };
+      case 'starbucks':
+        return { bg: '#00704A', border: '#ffffff' };
+      default:
+        return { bg: '#E53935', border: '#fff' };
+    }
+  };
+
   useEffect(() => {
     console.log("Setting up Map event listeners");
     
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
     window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
     
     return () => {
       console.log("Removing Map event listeners");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
       window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
     };
   }, []);
 

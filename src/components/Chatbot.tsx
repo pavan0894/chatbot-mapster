@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
-import { parseComplexSpatialQuery } from '@/utils/mapUtils';
+import { parseComplexSpatialQuery, parseMultiTargetQuery } from '@/utils/mapUtils';
 import { setupDebugEventListener, verifyEventCreation } from '@/utils/debugUtils';
 
 export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
@@ -25,11 +25,18 @@ export interface LocationQuery {
     includeRadius: number;
     excludeRadius: number;
   };
+  multiTargetQuery?: {
+    targetTypes: {
+      type: LocationSourceTarget;
+      radius: number;
+    }[];
+  };
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
 export const API_QUERY_EVENT = 'api-query-event';
 export const COMPLEX_QUERY_EVENT = 'complex-query-event';
+export const MULTI_TARGET_QUERY_EVENT = 'multi-target-query-event';
 
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
@@ -49,6 +56,12 @@ export function emitComplexQueryEvent(query: LocationQuery) {
   window.dispatchEvent(event);
 }
 
+export function emitMultiTargetQueryEvent(query: LocationQuery) {
+  console.log("Emitting multi-target query event:", query);
+  const event = new CustomEvent(MULTI_TARGET_QUERY_EVENT, { detail: query });
+  window.dispatchEvent(event);
+}
+
 export function emitApiQueryEvent(query: string) {
   console.log("Emitting API query event:", query);
   const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
@@ -57,6 +70,18 @@ export function emitApiQueryEvent(query: string) {
 
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
+  
+  const multiTargetQuery = parseMultiTargetQuery(message);
+  if (multiTargetQuery) {
+    console.log("Detected multi-target proximity query:", multiTargetQuery);
+    return {
+      source: 'property' as LocationSourceTarget,
+      radius: 5,
+      isDallasQuery: message.includes('dallas') || message.includes('dfw'),
+      queryText: message,
+      multiTargetQuery
+    };
+  }
   
   const complexQuery = parseComplexSpatialQuery(message);
   if (complexQuery) {
@@ -385,6 +410,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setupDebugEventListener(LOCATION_QUERY_EVENT);
     setupDebugEventListener(COMPLEX_QUERY_EVENT);
     setupDebugEventListener(API_QUERY_EVENT);
+    setupDebugEventListener(MULTI_TARGET_QUERY_EVENT);
     
     setTimeout(() => {
       const event = verifyEventCreation('chatbot-loaded', { status: 'ready' });
@@ -395,7 +421,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
-      text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?\n- Show me properties within 2 miles of FedEx and 4 miles away from Starbucks",
+      text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?\n- Show me properties within 2 miles of FedEx and 4 miles away from Starbucks\n- Find properties within 3 miles of FedEx and 2 miles of Starbucks",
       sender: 'bot',
       timestamp: new Date()
     };
@@ -467,13 +493,15 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     const processingMessage: MessageType = {
       id: `processing-${msgId}`,
       text: locationQuery ? 
-        (locationQuery.complexQuery ? 
-          "Processing complex spatial query..." :
-          locationQuery.source === 'fedex' ? 
-            "Searching for FedEx locations..." : 
-            locationQuery.source === 'starbucks' ?
-              "Searching for Starbucks locations..." :
-              "Searching for industrial properties...") :
+        (locationQuery.multiTargetQuery ? 
+          "Processing multi-target proximity query..." :
+          locationQuery.complexQuery ? 
+            "Processing complex spatial query..." :
+            locationQuery.source === 'fedex' ? 
+              "Searching for FedEx locations..." : 
+              locationQuery.source === 'starbucks' ?
+                "Searching for Starbucks locations..." :
+                "Searching for industrial properties...") :
         "Processing your request...",
       sender: 'bot',
       timestamp: new Date()
@@ -509,9 +537,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     try {
       if (locationQuery) {
-        console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
+        console.log("About to emit query event with details:", JSON.stringify(locationQuery));
         
-        if (locationQuery.complexQuery) {
+        if (locationQuery.multiTargetQuery) {
+          emitMultiTargetQueryEvent(locationQuery);
+        } else if (locationQuery.complexQuery) {
           emitComplexQueryEvent(locationQuery);
         } else {
           const event = new CustomEvent(LOCATION_QUERY_EVENT, { 

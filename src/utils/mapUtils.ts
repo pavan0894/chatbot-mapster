@@ -307,3 +307,175 @@ export function parseComplexSpatialQuery(query: string): {
     excludeRadius
   };
 }
+
+/**
+ * Find properties that are within specific distances of multiple target types
+ * Example: Find properties within 2 miles of FedEx and 3 miles of Starbucks
+ */
+export function findPropertiesWithMultiTargetProximity(
+  properties: LocationWithCoordinates[],
+  targetTypes: {
+    type: string, 
+    locations: LocationWithCoordinates[], 
+    radius: number
+  }[]
+): {
+  resultProperties: LocationWithCoordinates[],
+  connections: Array<{ 
+    source: [number, number]; 
+    target: [number, number]; 
+    targetType: string;
+    distance: number 
+  }>
+} {
+  let resultProperties: LocationWithCoordinates[] = [];
+  const connections: Array<{ 
+    source: [number, number]; 
+    target: [number, number]; 
+    targetType: string;
+    distance: number 
+  }> = [];
+
+  // Start with all properties
+  resultProperties = [...properties];
+
+  // Filter properties that match ALL target proximity criteria
+  targetTypes.forEach(targetData => {
+    const { type, locations, radius } = targetData;
+    
+    // Keep only properties that are within radius of at least one location of this type
+    resultProperties = resultProperties.filter(property => {
+      const propertyCoords = getCoordinates(property);
+      
+      // Check if the property is within radius of any location of this type
+      for (const location of locations) {
+        const locationCoords = getCoordinates(location);
+        const distance = calculateDistance(
+          propertyCoords[0],
+          propertyCoords[1],
+          locationCoords[0],
+          locationCoords[1]
+        );
+        
+        if (distance <= radius) {
+          // Add connection for visualization
+          connections.push({
+            source: propertyCoords,
+            target: locationCoords,
+            targetType: type,
+            distance
+          });
+          return true; // This property is within radius of at least one location of this type
+        }
+      }
+      
+      return false; // Property is not within radius of any location of this type
+    });
+  });
+
+  return {
+    resultProperties,
+    connections
+  };
+}
+
+/**
+ * Parse a multi-target proximity query
+ * Example: "find properties within 2 miles of fedex and 3 miles of starbucks"
+ */
+export function parseMultiTargetQuery(query: string): {
+  targetTypes: {
+    type: string,
+    radius: number
+  }[]
+} | null {
+  const queryLower = query.toLowerCase();
+  
+  // Check if this is a property search with multiple targets
+  if (!queryLower.includes('propert') && 
+      !queryLower.includes('warehous') && 
+      !queryLower.includes('industrial')) {
+    return null;
+  }
+  
+  // Check for phrases indicating multi-target search
+  const multiTargetPatterns = [
+    /within\s+(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)(?:.*?)(?:and|&)\s*(?:within)?\s*(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)/i,
+    /(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)(?:.*?)(?:and|&)\s*(?:within)?\s*(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)/i,
+    /near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?(?:.*?)(?:and|&)(?:.*?)near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?/i
+  ];
+  
+  for (const pattern of multiTargetPatterns) {
+    const match = queryLower.match(pattern);
+    if (match) {
+      const targetTypes = [];
+      
+      // Pattern 1 & 2: within X miles of A and Y miles of B
+      if (match[1] && match[2] && match[3] && match[4]) {
+        const type1 = normalizeLocationType(match[2]);
+        const radius1 = parseInt(match[1], 10);
+        const type2 = normalizeLocationType(match[4]); 
+        const radius2 = parseInt(match[3], 10);
+        
+        if (type1 && type2) {
+          targetTypes.push({ type: type1, radius: radius1 });
+          targetTypes.push({ type: type2, radius: radius2 });
+          return { targetTypes };
+        }
+      }
+    }
+  }
+  
+  // Simpler pattern matching approach as fallback
+  const fedexRadius = extractRadiusForType(queryLower, 'fedex');
+  const starbucksRadius = extractRadiusForType(queryLower, 'starbucks');
+  
+  if (fedexRadius > 0 && starbucksRadius > 0) {
+    return {
+      targetTypes: [
+        { type: 'fedex', radius: fedexRadius },
+        { type: 'starbucks', radius: starbucksRadius }
+      ]
+    };
+  }
+  
+  return null;
+}
+
+// Helper function to extract radius for a specific location type
+function extractRadiusForType(query: string, type: string): number {
+  const patterns = [
+    new RegExp(`(\\d+)\\s*miles?\\s*(?:of|from|to)\\s*${type}`, 'i'),
+    new RegExp(`${type}\\s*(?:within|in)\\s*(\\d+)\\s*miles?`, 'i'),
+    new RegExp(`near\\s*${type}\\s*(?:within|in)\\s*(\\d+)\\s*miles?`, 'i')
+  ];
+  
+  for (const pattern of patterns) {
+    const match = query.match(pattern);
+    if (match && match[1]) {
+      return parseInt(match[1], 10);
+    }
+  }
+  
+  // Default radius if mentioned but not specified
+  if (query.includes(type)) {
+    return 5;
+  }
+  
+  return 0;
+}
+
+// Helper function to normalize location type names
+function normalizeLocationType(type: string): string | null {
+  type = type.toLowerCase();
+  
+  if (type.includes('fedex') || type.includes('fed') || type.includes('express')) {
+    return 'fedex';
+  } else if (type.includes('starbucks') || type.includes('coffee') || type.includes('cafe')) {
+    return 'starbucks';
+  } else if (type.includes('propert') || type.includes('warehouse') || type.includes('industrial')) {
+    return 'property';
+  }
+  
+  return null;
+}
