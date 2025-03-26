@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -606,4 +607,210 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       console.log("Showing Dallas property locations");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
       fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate
+      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+    }
+    
+    if (isFedExQuery) {
+      console.log("Processing FedEx query");
+      const fedExLocs = loadFedExLocations();
+      
+      if (query.source === 'fedex' && !query.target) {
+        // Show all FedEx locations
+        addFedExLocations();
+        fitMapToLocations(fedExLocs.map(loc => loc.coordinates as [number, number]));
+      } else if (query.source === 'property' && query.target === 'fedex' && query.radius) {
+        // Show properties near FedEx locations
+        const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
+          INDUSTRIAL_PROPERTIES,
+          fedExLocs,
+          query.radius
+        );
+        
+        console.log(`Found ${sourceLocations.length} properties within ${query.radius} miles of FedEx locations`);
+        
+        if (sourceLocations.length > 0) {
+          addFilteredLocations(sourceLocations, 'property', '#3366cc', '#ffffff');
+          addFilteredLocations(targetLocations, 'fedex', '#FF6600', '#ffffff');
+          addConnectionLines(connections);
+          
+          const allCoordinates = [
+            ...sourceLocations.map(loc => loc.coordinates as [number, number]),
+            ...targetLocations.map(loc => loc.coordinates as [number, number])
+          ];
+          
+          fitMapToLocations(allCoordinates);
+          emitResultsUpdate(sourceLocations);
+        } else {
+          console.log("No properties found within the specified radius of FedEx locations");
+        }
+      }
+    }
+    
+    if (isStarbucksQuery) {
+      console.log("Processing Starbucks query");
+      
+      if (query.source === 'starbucks' && !query.target) {
+        // Show all Starbucks locations
+        addStarbucksLocations();
+        fitMapToLocations(STARBUCKS_LOCATIONS.map(loc => loc.coordinates as [number, number]));
+      } else if (query.source === 'property' && query.target === 'starbucks' && query.radius) {
+        // Show properties near Starbucks locations
+        const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
+          INDUSTRIAL_PROPERTIES,
+          STARBUCKS_LOCATIONS,
+          query.radius
+        );
+        
+        console.log(`Found ${sourceLocations.length} properties within ${query.radius} miles of Starbucks locations`);
+        
+        if (sourceLocations.length > 0) {
+          addFilteredLocations(sourceLocations, 'property', '#3366cc', '#ffffff');
+          addFilteredLocations(targetLocations, 'starbucks', '#00704A', '#ffffff');
+          addConnectionLines(connections);
+          
+          const allCoordinates = [
+            ...sourceLocations.map(loc => loc.coordinates as [number, number]),
+            ...targetLocations.map(loc => loc.coordinates as [number, number])
+          ];
+          
+          fitMapToLocations(allCoordinates);
+          emitResultsUpdate(sourceLocations);
+        } else {
+          console.log("No properties found within the specified radius of Starbucks locations");
+        }
+      }
+    }
+    
+    // Handle multi-target queries (properties near BOTH FedEx AND Starbucks)
+    if (query.isMultiTargetQuery) {
+      console.log("Processing multi-target query:", query.multiTargetDetails);
+      
+      if (query.multiTargetDetails && query.multiTargetDetails.targetTypes) {
+        const targetData = [];
+        
+        // Process FedEx locations if needed
+        const fedExTarget = query.multiTargetDetails.targetTypes.find(t => t.type === 'fedex');
+        if (fedExTarget) {
+          targetData.push({
+            type: 'fedex' as const,
+            locations: loadFedExLocations(),
+            radius: fedExTarget.radius
+          });
+        }
+        
+        // Process Starbucks locations if needed
+        const starbucksTarget = query.multiTargetDetails.targetTypes.find(t => t.type === 'starbucks');
+        if (starbucksTarget) {
+          targetData.push({
+            type: 'starbucks' as const,
+            locations: STARBUCKS_LOCATIONS,
+            radius: starbucksTarget.radius
+          });
+        }
+        
+        if (targetData.length > 0) {
+          console.log("Searching for properties matching multi-target criteria");
+          const { resultProperties, connections } = findPropertiesWithMultiTargetProximity(
+            INDUSTRIAL_PROPERTIES,
+            targetData
+          );
+          
+          console.log(`Found ${resultProperties.length} properties matching all criteria`);
+          
+          if (resultProperties.length > 0) {
+            // Add property markers
+            addFilteredLocations(resultProperties, 'property', '#3366cc', '#ffffff');
+            
+            // Add FedEx markers if part of query
+            if (fedExTarget) {
+              const fedExConnections = connections.filter(c => c.targetType === 'fedex');
+              const uniqueFedExLocations = new Map<string, LocationWithCoordinates>();
+              
+              fedExConnections.forEach(conn => {
+                const fedLoc = fedExLocations.find(f => 
+                  f.coordinates[0] === conn.target[0] && f.coordinates[1] === conn.target[1]
+                );
+                if (fedLoc) {
+                  uniqueFedExLocations.set(`${conn.target[0]}-${conn.target[1]}`, fedLoc);
+                }
+              });
+              
+              const fedExLocsToShow = Array.from(uniqueFedExLocations.values());
+              if (fedExLocsToShow.length > 0) {
+                addFilteredLocations(fedExLocsToShow, 'fedex', '#FF6600', '#ffffff');
+              }
+            }
+            
+            // Add Starbucks markers if part of query
+            if (starbucksTarget) {
+              const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
+              const uniqueStarbucksLocations = new Map<string, LocationWithCoordinates>();
+              
+              starbucksConnections.forEach(conn => {
+                const sbLoc = STARBUCKS_LOCATIONS.find(s => 
+                  s.coordinates[0] === conn.target[0] && s.coordinates[1] === conn.target[1]
+                );
+                if (sbLoc) {
+                  uniqueStarbucksLocations.set(`${conn.target[0]}-${conn.target[1]}`, sbLoc);
+                }
+              });
+              
+              const starbucksLocsToShow = Array.from(uniqueStarbucksLocations.values());
+              if (starbucksLocsToShow.length > 0) {
+                addFilteredLocations(starbucksLocsToShow, 'starbucks', '#00704A', '#ffffff');
+              }
+            }
+            
+            // Add connection lines
+            if (connections.length > 0) {
+              const simpleConnections = connections.map(conn => ({
+                source: conn.source,
+                target: conn.target,
+                distance: conn.distance
+              }));
+              
+              addConnectionLines(simpleConnections);
+            }
+            
+            // Fit map to show all relevant locations
+            const allCoordinates = [
+              ...resultProperties.map(loc => loc.coordinates as [number, number]),
+              ...connections.map(conn => conn.target)
+            ];
+            
+            fitMapToLocations(allCoordinates);
+            emitResultsUpdate(resultProperties);
+          } else {
+            console.log("No properties found matching all criteria");
+          }
+        }
+      }
+    }
+    
+    // Update visible location types based on what's being shown
+    emitMapContextUpdate({
+      visibleLocations: visibleLocationTypes,
+      query: query,
+      properties: displayedProperties
+    });
+  };
+
+  useEffect(() => {
+    console.log("Setting up event listeners in Map component");
+    
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    
+    return () => {
+      console.log("Cleaning up event listeners in Map component");
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    };
+  }, [mapInitialized, fedExLoaded, starbucksLoaded]);
+
+  return (
+    <div className={`relative w-full h-full overflow-hidden ${className}`}>
+      <div ref={mapContainer} className="absolute inset-0" />
+    </div>
+  );
+};
+
+export default Map;
