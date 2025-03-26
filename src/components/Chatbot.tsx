@@ -92,10 +92,73 @@ function isLocationQuery(message: string): LocationQuery | null {
       isDallasQuery: message.includes('dallas') || message.includes('dfw'),
       queryText: message,
       complexQuery: {
-        includeType: complexQuery.includeType as LocationSourceTarget,
-        excludeType: complexQuery.excludeType as LocationSourceTarget,
+        includeType: complexQuery.includeType,
+        excludeType: complexQuery.excludeType,
         includeRadius: complexQuery.includeRadius,
         excludeRadius: complexQuery.excludeRadius
+      }
+    };
+  }
+  
+  const nearFarPattern = /(properties|warehouses|industrial).*?(near|close to).*?(fedex).*?(far from|away from|not near).*?(starbucks)|.*?(fedex).*?(properties|warehouses|industrial).*?(not near|far from|away from).*?(starbucks)/i;
+  const farNearPattern = /(properties|warehouses|industrial).*?(near|close to).*?(starbucks).*?(far from|away from|not near).*?(fedex)|.*?(starbucks).*?(properties|warehouses|industrial).*?(not near|far from|away from).*?(fedex)/i;
+  
+  if (nearFarPattern.test(message)) {
+    console.log("Detected complex spatial query using pattern matching (near FedEx, far from Starbucks)");
+    let includeRadius = 2;
+    let excludeRadius = 3;
+    
+    const nearRadiusMatch = message.match(/(\d+)\s*miles?\s*(?:of|from|to|near)\s*fedex/i);
+    const farRadiusMatch = message.match(/(\d+)\s*miles?\s*(?:away|far)\s*(?:from)\s*starbucks/i);
+    
+    if (nearRadiusMatch && nearRadiusMatch[1]) {
+      includeRadius = parseInt(nearRadiusMatch[1], 10);
+    }
+    
+    if (farRadiusMatch && farRadiusMatch[1]) {
+      excludeRadius = parseInt(farRadiusMatch[1], 10);
+    }
+    
+    return {
+      source: 'property' as LocationSourceTarget,
+      radius: includeRadius,
+      isDallasQuery: message.includes('dallas') || message.includes('dfw'),
+      queryText: message,
+      complexQuery: {
+        includeType: 'fedex',
+        excludeType: 'starbucks', 
+        includeRadius,
+        excludeRadius
+      }
+    };
+  }
+  
+  if (farNearPattern.test(message)) {
+    console.log("Detected complex spatial query using pattern matching (near Starbucks, far from FedEx)");
+    let includeRadius = 2;
+    let excludeRadius = 3;
+    
+    const nearRadiusMatch = message.match(/(\d+)\s*miles?\s*(?:of|from|to|near)\s*starbucks/i);
+    const farRadiusMatch = message.match(/(\d+)\s*miles?\s*(?:away|far)\s*(?:from)\s*fedex/i);
+    
+    if (nearRadiusMatch && nearRadiusMatch[1]) {
+      includeRadius = parseInt(nearRadiusMatch[1], 10);
+    }
+    
+    if (farRadiusMatch && farRadiusMatch[1]) {
+      excludeRadius = parseInt(farRadiusMatch[1], 10);
+    }
+    
+    return {
+      source: 'property' as LocationSourceTarget,
+      radius: includeRadius,
+      isDallasQuery: message.includes('dallas') || message.includes('dfw'),
+      queryText: message,
+      complexQuery: {
+        includeType: 'starbucks',
+        excludeType: 'fedex',
+        includeRadius,
+        excludeRadius
       }
     };
   }

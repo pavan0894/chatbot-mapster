@@ -3,6 +3,9 @@ function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
 }
 
+// Import needed type for location sources/targets
+import { LocationSourceTarget } from '../components/Chatbot';
+
 // Calculate distance between two points using Haversine formula
 export function calculateDistance(
   lon1: number, 
@@ -229,8 +232,8 @@ export function getCoordinates(location: LocationWithCoordinates): [number, numb
  */
 export function parseComplexSpatialQuery(query: string): {
   primaryType: string;
-  includeType: string;
-  excludeType: string;
+  includeType: LocationSourceTarget;
+  excludeType: LocationSourceTarget;
   includeRadius: number;
   excludeRadius: number;
 } | null {
@@ -238,8 +241,8 @@ export function parseComplexSpatialQuery(query: string): {
   
   // Default values
   let primaryType = 'property';
-  let includeType = '';
-  let excludeType = '';
+  let includeType: LocationSourceTarget | null = null;
+  let excludeType: LocationSourceTarget | null = null;
   let includeRadius = 2; // Default radius in miles
   let excludeRadius = 2; // Default radius in miles
   
@@ -252,44 +255,70 @@ export function parseComplexSpatialQuery(query: string): {
     primaryType = 'property'; // We're treating industrial facilities as properties
   }
   
-  // Detect include location type
-  if (queryLower.includes('within') || queryLower.includes('near') || queryLower.includes('close to')) {
-    if (queryLower.includes('fedex')) {
-      includeType = 'fedex';
+  // Check for specific patterns like "near X but away from Y"
+  const proximityPattern = /(near|close\s+to|within|next\s+to)\s+(\w+).*?(away\s+from|far\s+from|not\s+near|outside)\s+(\w+)/i;
+  const proximityMatch = queryLower.match(proximityPattern);
+  
+  if (proximityMatch) {
+    const nearType = normalizeLocationType(proximityMatch[2]);
+    const farType = normalizeLocationType(proximityMatch[4]);
+    
+    if (nearType && farType) {
+      includeType = nearType;
+      excludeType = farType;
       
-      // Try to extract radius for include
-      const includeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(of|from|to)\s*fedex/i);
-      if (includeRadiusMatch && includeRadiusMatch[1]) {
-        includeRadius = parseInt(includeRadiusMatch[1], 10);
+      // Try to extract radii
+      const nearRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(?:of|from|to)\s*\b(fedex|starbucks)\b/i);
+      const farRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(?:from)\s*\b(fedex|starbucks)\b/i);
+      
+      if (nearRadiusMatch && nearRadiusMatch[2].toLowerCase().includes(includeType)) {
+        includeRadius = parseInt(nearRadiusMatch[1], 10);
       }
-    } else if (queryLower.includes('starbucks')) {
-      includeType = 'starbucks';
       
-      // Try to extract radius for include
-      const includeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(of|from|to)\s*starbucks/i);
-      if (includeRadiusMatch && includeRadiusMatch[1]) {
-        includeRadius = parseInt(includeRadiusMatch[1], 10);
+      if (farRadiusMatch && farRadiusMatch[2].toLowerCase().includes(excludeType)) {
+        excludeRadius = parseInt(farRadiusMatch[1], 10);
       }
     }
-  }
-  
-  // Detect exclude location type
-  if (queryLower.includes('away from') || queryLower.includes('far from') || queryLower.includes('outside')) {
-    if (queryLower.includes('fedex')) {
-      excludeType = 'fedex';
-      
-      // Try to extract radius for exclude
-      const excludeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(from)\s*fedex/i);
-      if (excludeRadiusMatch && excludeRadiusMatch[1]) {
-        excludeRadius = parseInt(excludeRadiusMatch[1], 10);
+  } else {
+    // Detect include location type
+    if (queryLower.includes('within') || queryLower.includes('near') || queryLower.includes('close to')) {
+      if (queryLower.includes('fedex')) {
+        includeType = 'fedex';
+        
+        // Try to extract radius for include
+        const includeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(of|from|to)\s*fedex/i);
+        if (includeRadiusMatch && includeRadiusMatch[1]) {
+          includeRadius = parseInt(includeRadiusMatch[1], 10);
+        }
+      } else if (queryLower.includes('starbucks')) {
+        includeType = 'starbucks';
+        
+        // Try to extract radius for include
+        const includeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(of|from|to)\s*starbucks/i);
+        if (includeRadiusMatch && includeRadiusMatch[1]) {
+          includeRadius = parseInt(includeRadiusMatch[1], 10);
+        }
       }
-    } else if (queryLower.includes('starbucks')) {
-      excludeType = 'starbucks';
-      
-      // Try to extract radius for exclude
-      const excludeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(from)\s*starbucks/i);
-      if (excludeRadiusMatch && excludeRadiusMatch[1]) {
-        excludeRadius = parseInt(excludeRadiusMatch[1], 10);
+    }
+    
+    // Detect exclude location type
+    if (queryLower.includes('away from') || queryLower.includes('far from') || queryLower.includes('outside')) {
+      if (queryLower.includes('fedex')) {
+        excludeType = 'fedex';
+        
+        // Try to extract radius for exclude
+        const excludeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(from)\s*fedex/i);
+        if (excludeRadiusMatch && excludeRadiusMatch[1]) {
+          excludeRadius = parseInt(excludeRadiusMatch[1], 10);
+        }
+      } else if (queryLower.includes('starbucks')) {
+        excludeType = 'starbucks';
+        
+        // Try to extract radius for exclude
+        const excludeRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(from)\s*starbucks/i);
+        if (excludeRadiusMatch && excludeRadiusMatch[1]) {
+          excludeRadius = parseInt(excludeRadiusMatch[1], 10);
+        }
       }
     }
   }
@@ -315,7 +344,7 @@ export function parseComplexSpatialQuery(query: string): {
 export function findPropertiesWithMultiTargetProximity(
   properties: LocationWithCoordinates[],
   targetTypes: {
-    type: string, 
+    type: LocationSourceTarget, 
     locations: LocationWithCoordinates[], 
     radius: number
   }[]
@@ -324,7 +353,7 @@ export function findPropertiesWithMultiTargetProximity(
   connections: Array<{ 
     source: [number, number]; 
     target: [number, number]; 
-    targetType: string;
+    targetType: LocationSourceTarget;
     distance: number 
   }>
 } {
@@ -332,7 +361,7 @@ export function findPropertiesWithMultiTargetProximity(
   const connections: Array<{ 
     source: [number, number]; 
     target: [number, number]; 
-    targetType: string;
+    targetType: LocationSourceTarget;
     distance: number 
   }> = [];
 
@@ -418,8 +447,8 @@ export function parseMultiTargetQuery(query: string): {
         const radius2 = parseInt(match[3], 10);
         
         if (type1 && type2) {
-          targetTypes.push({ type: type1 as LocationSourceTarget, radius: radius1 });
-          targetTypes.push({ type: type2 as LocationSourceTarget, radius: radius2 });
+          targetTypes.push({ type: type1, radius: radius1 });
+          targetTypes.push({ type: type2, radius: radius2 });
           return { targetTypes };
         }
       }
