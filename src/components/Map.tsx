@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -50,7 +49,6 @@ const INDUSTRIAL_PROPERTIES: LocationWithCoordinates[] = [
   { name: "Hutchins Logistics Center", coordinates: [-96.7112, 32.6421], description: "Cold storage distribution" }
 ];
 
-// Function to dynamically load FedEx locations ONLY when requested
 function getFedExLocations(): LocationWithCoordinates[] {
   console.log("Dynamically loading FedEx locations");
   return [
@@ -307,17 +305,23 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
     
     // Clear all existing markers and layers first
-    clearFilteredLocations();
     clearAllMarkers();
+    clearFilteredLocations();
     
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
-    // If no FedEx is mentioned in the query, only show industrial properties
+    // If FedEx is not mentioned, only show filtered industrial properties
     if (!isFedExQuery) {
-      addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
-      fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-      console.log("Showing all industrial properties - no FedEx mentioned");
+      if (query.source === 'property') {
+        // For specific property queries, apply any filtering logic here
+        addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
+        fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+        emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+        console.log("Showing filtered industrial properties");
+      } else {
+        // Default: no specific query, show all industrial properties
+        addIndustrialProperties();
+      }
       return;
     }
     
@@ -343,15 +347,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(fedExLocations);
       console.log("Showing all FedEx locations:", fedExLocations.length);
-      return;
-    }
-    
-    // Handle "property" source with no target - show all properties
-    if (query.source === 'property' && !query.target) {
-      addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
-      fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-      console.log("Showing all Industrial properties:", INDUSTRIAL_PROPERTIES.length);
       return;
     }
     
