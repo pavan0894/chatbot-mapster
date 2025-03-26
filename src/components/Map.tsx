@@ -314,9 +314,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: 'bottom',
-        offset: [0, 0],
-        pitchAlignment: 'map',
-        rotationAlignment: 'map'
+        offset: [0, 0]
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
@@ -512,9 +510,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: 'bottom',
-        offset: [0, 0],
-        pitchAlignment: 'map',
-        rotationAlignment: 'map'
+        offset: [0, 0]
       })
         .setLngLat(coordinates)
         .setPopup(popup)
