@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -21,11 +20,19 @@ export interface LocationQuery {
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
+export const API_QUERY_EVENT = 'api-query-event';
 
 // Emit a location query event
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
   const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
+  window.dispatchEvent(event);
+}
+
+// Get currently displayed map locations
+export function emitApiQueryEvent(query: string) {
+  console.log("Emitting API query event:", query);
+  const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
   window.dispatchEvent(event);
 }
 
@@ -337,15 +344,6 @@ function isLocationQuery(message: string): LocationQuery | null {
   return null;
 }
 
-// Get currently displayed map locations
-const API_QUERY_EVENT = 'api-query-event';
-
-export function emitApiQueryEvent(query: string) {
-  console.log("Emitting API query event:", query);
-  const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
-  window.dispatchEvent(event);
-}
-
 interface ChatbotProps {
   className?: string;
 }
@@ -361,7 +359,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     lastQuery?: LocationQuery;
   }>({});
   
-  // Welcome message
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
@@ -372,7 +369,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages([welcomeMessage]);
   }, []);
   
-  // Listen for updates from the map about what's currently displayed
   useEffect(() => {
     const handleMapUpdate = (e: CustomEvent<any>) => {
       if (e.detail && e.detail.visibleLocations) {
@@ -390,16 +386,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       }
     };
     
-    // Add event listener
     window.addEventListener('map-context-update', handleMapUpdate as EventListener);
     
-    // Cleanup
     return () => {
       window.removeEventListener('map-context-update', handleMapUpdate as EventListener);
     };
   }, []);
   
-  // Auto-scroll to the latest message
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -414,10 +407,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     setIsProcessing(true);
     
-    // Generate unique ID for message
     const msgId = Date.now().toString();
     
-    // Add user message
     const userMessage: MessageType = {
       id: msgId,
       text: input,
@@ -427,11 +418,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     setMessages(prevMessages => [...prevMessages, userMessage]);
 
-    // Check if the message is a location query
     const locationQuery = isLocationQuery(input);
     console.log("Location query detected in Chatbot:", locationQuery);
 
-    // Create a temporary processing message
     const processingMessage: MessageType = {
       id: `processing-${msgId}`,
       text: locationQuery ? 
@@ -447,7 +436,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     
     setMessages(prevMessages => [...prevMessages, processingMessage]);
 
-    // Convert messages to format expected by AI service
     const messageHistory: ChatMessageData[] = messages
       .filter(msg => msg.id !== `processing-${msgId}`)
       .map(msg => ({
@@ -455,13 +443,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         content: msg.text
       }));
     
-    // Add current user message
     messageHistory.push({
       role: 'user',
       content: input
     });
     
-    // Add context about what's currently displayed on the map
     if (mapContext.visibleLocations && mapContext.visibleLocations.length > 0) {
       messageHistory.push({
         role: 'system',
@@ -477,23 +463,18 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     }
     
     try {
-      // If this is a location query, trigger the map update event
       if (locationQuery) {
-        // Log the query details before dispatching the event
         console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
         
-        // Create and dispatch the custom event with proper detail
         const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
           detail: locationQuery,
           bubbles: true,
           cancelable: true
         });
         
-        // Explicitly dispatch event from window
         window.dispatchEvent(event);
         console.log("Location query event dispatched");
       } else {
-        // For non-location queries that still need map data
         if (input.includes("?") || 
             input.toLowerCase().includes("how many") || 
             input.toLowerCase().includes("which ones") ||
@@ -502,10 +483,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         }
       }
       
-      // Get AI response
       const response = await getAIResponse(messageHistory);
       
-      // Replace processing message with actual response
       setMessages(prevMessages => 
         prevMessages.map(msg => 
           msg.id === `processing-${msgId}` 
@@ -524,7 +503,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     } catch (error) {
       console.error("Error getting AI response:", error);
       
-      // Replace processing message with error message
       setMessages(prevMessages => 
         prevMessages.map(msg => 
           msg.id === `processing-${msgId}` 
@@ -544,19 +522,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       });
     }
 
-    // Clear input and reset processing state
     setInput('');
     setIsProcessing(false);
   }, [input, messages, isProcessing, toast, mapContext]);
 
-  // Handle Enter key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       sendMessage();
     }
   };
 
-  // Function to handle suggestion clicks
   const handleSuggestionClick = (suggestion: string) => {
     setInput(suggestion);
     setTimeout(() => sendMessage(), 100);
@@ -565,7 +540,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   return (
     <Card className={cn("w-full h-full rounded-none flex flex-col", className)}>
       <CardContent className="flex flex-col h-full p-0">
-        {/* Chat Messages */}
         <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
           <div className="flex flex-col space-y-4">
             {messages.map((message) => (
@@ -582,7 +556,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
               </div>
             )}
             
-            {/* Suggestions (shown after user gets replies from the bot) */}
             {messages.length > 1 && !isProcessing && (
               <div className="flex flex-wrap gap-2 mt-4">
                 {generateSuggestedQuestions(messages.filter(m => m.id !== 'welcome').map(m => ({
@@ -604,7 +577,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           </div>
         </ScrollArea>
 
-        {/* Input Area */}
         <div className="p-4 border-t border-border mt-auto">
           <div className="flex items-center space-x-2">
             <Input
