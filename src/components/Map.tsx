@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -683,4 +684,339 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.style.height = '32px';
       el.style.borderRadius = '50%';
       el.style.backgroundColor = '#FFFFFF';
-      el.style.
+      el.style.backgroundImage = "url('/fedex-logo.png')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.style.border = '2px solid #FF6600';
+      
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates as [number, number])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`<h3>${location.name}</h3><p>${location.description}</p>`)
+        )
+        .addTo(map.current);
+      
+      markers.push(marker);
+    });
+    
+    setActiveMarkers(prev => [...prev, ...markers]);
+    return markers;
+  };
+  
+  const addStarbucksLocations = () => {
+    if (!map.current) {
+      console.error("Map not initialized when adding Starbucks locations");
+      return [];
+    }
+    
+    if (!starbucksLoaded) {
+      setStarbucksLoaded(true);
+    }
+    
+    console.log("Adding Starbucks locations markers");
+    const markers: mapboxgl.Marker[] = [];
+    
+    STARBUCKS_LOCATIONS.forEach(location => {
+      const el = document.createElement('div');
+      el.className = 'starbucks-marker';
+      el.style.width = '32px';
+      el.style.height = '32px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#FFFFFF';
+      el.style.backgroundImage = "url('/starbucks-logo.png')";
+      el.style.backgroundSize = 'cover';
+      el.style.backgroundPosition = 'center';
+      el.style.border = '2px solid #00704A';
+      
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates as [number, number])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`<h3>${location.name}</h3><p>${location.description}</p>`)
+        )
+        .addTo(map.current);
+      
+      markers.push(marker);
+    });
+    
+    setActiveMarkers(prev => [...prev, ...markers]);
+    return markers;
+  };
+
+  const addFilteredLocations = (
+    locations: LocationWithCoordinates[],
+    locationType: 'property' | 'fedex' | 'starbucks',
+    backgroundColor: string,
+    borderColor: string
+  ) => {
+    if (!map.current) {
+      console.error("Map not initialized when adding filtered locations");
+      return;
+    }
+    
+    console.log(`Adding ${locations.length} ${locationType} locations`);
+    const markers: mapboxgl.Marker[] = [];
+    
+    // Update visible location types
+    setVisibleLocationTypes(prev => {
+      if (!prev.includes(locationType)) {
+        return [...prev, locationType];
+      }
+      return prev;
+    });
+    
+    // Add markers for each location
+    locations.forEach(location => {
+      const el = document.createElement('div');
+      el.className = `${locationType}-marker`;
+      
+      // Use custom icon for FedEx and Starbucks
+      if (locationType === 'fedex') {
+        el.style.width = '32px';
+        el.style.height = '32px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#FFFFFF';
+        el.style.backgroundImage = "url('/fedex-logo.png')";
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+        el.style.border = '2px solid #FF6600';
+      } else if (locationType === 'starbucks') {
+        el.style.width = '32px';
+        el.style.height = '32px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#FFFFFF';
+        el.style.backgroundImage = "url('/starbucks-logo.png')";
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+        el.style.border = '2px solid #00704A';
+      } else {
+        // Default marker style for properties
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = backgroundColor;
+        el.style.border = `2px solid ${borderColor}`;
+      }
+      
+      // Create the marker
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat(location.coordinates as [number, number])
+        .setPopup(
+          new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`<h3>${location.name}</h3><p>${location.description}</p>`)
+        )
+        .addTo(map.current);
+      
+      markers.push(marker);
+    });
+    
+    // Update active markers state
+    setActiveMarkers(prev => [...prev, ...markers]);
+    
+    // If these are properties, update the displayed properties state too
+    if (locationType === 'property') {
+      setDisplayedProperties(locations);
+    }
+  };
+
+  const clearAllMarkers = () => {
+    console.log("Clearing all markers");
+    
+    // Remove all markers from the map
+    activeMarkers.forEach(marker => marker.remove());
+    
+    // Reset the active markers array
+    setActiveMarkers([]);
+    
+    // Clear displayed properties
+    setDisplayedProperties([]);
+    
+    // Reset visible location types
+    setVisibleLocationTypes([]);
+  };
+
+  const clearFilteredLocations = () => {
+    if (!map.current) return;
+    
+    console.log("Clearing filtered locations and connection lines");
+    
+    // Check and remove any existing layers for connections
+    checkAndRemoveLayers(map.current, activeLayers, 'connections');
+    
+    // Reset active layers
+    setActiveLayers([]);
+    
+    // Clear all markers
+    clearAllMarkers();
+  };
+
+  const addConnectionLines = (
+    connections: Array<{ 
+      source: [number, number]; 
+      target: [number, number]; 
+      distance: number;
+      targetType?: LocationSourceTarget;
+    }>
+  ) => {
+    if (!map.current || connections.length === 0) return;
+    
+    console.log(`Adding ${connections.length} connection lines`);
+    
+    // Create layers for connection lines
+    const layerId = 'connections-layer';
+    const sourceId = 'connections';
+    
+    // Remove any existing layers before adding new ones
+    checkAndRemoveLayers(map.current, [...activeLayers, layerId], sourceId);
+    
+    // Create features for connection lines
+    const features = connections.map(conn => {
+      const targetType = conn.targetType || 'default';
+      
+      let lineColor = '#4B5563'; // Default gray
+      
+      if (targetType === 'fedex') {
+        lineColor = '#FF6600'; // FedEx orange
+      } else if (targetType === 'starbucks') {
+        lineColor = '#00704A'; // Starbucks green
+      } else if (targetType === 'property') {
+        lineColor = '#3B82F6'; // Blue
+      }
+      
+      return {
+        type: 'Feature',
+        properties: {
+          distance: conn.distance,
+          description: `Distance: ${conn.distance.toFixed(2)} miles`,
+          targetType,
+          color: lineColor
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: [conn.source, conn.target]
+        }
+      };
+    });
+    
+    // Add source
+    map.current.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features
+      }
+    });
+    
+    // Add line layer
+    map.current.addLayer({
+      id: layerId,
+      type: 'line',
+      source: sourceId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 2,
+        'line-dasharray': [2, 1]
+      }
+    });
+    
+    // Update active layers
+    setActiveLayers(prev => [...prev, layerId]);
+  };
+
+  const addExcludeConnectionLines = (
+    connections: Array<{ 
+      source: [number, number]; 
+      target: [number, number]; 
+      distance: number;
+    }>
+  ) => {
+    if (!map.current || connections.length === 0) return;
+    
+    console.log(`Adding ${connections.length} exclude connection lines`);
+    
+    // Create layers for connection lines
+    const layerId = 'exclude-connections-layer';
+    const sourceId = 'exclude-connections';
+    
+    // Remove any existing layers before adding new ones
+    checkAndRemoveLayers(map.current, [...activeLayers, layerId], sourceId);
+    
+    // Create features for connection lines
+    const features = connections.map(conn => ({
+      type: 'Feature',
+      properties: {
+        distance: conn.distance,
+        description: `Excluded: ${conn.distance.toFixed(2)} miles`
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [conn.source, conn.target]
+      }
+    }));
+    
+    // Add source
+    map.current.addSource(sourceId, {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features
+      }
+    });
+    
+    // Add line layer
+    map.current.addLayer({
+      id: layerId,
+      type: 'line',
+      source: sourceId,
+      layout: {
+        'line-join': 'round',
+        'line-cap': 'round'
+      },
+      paint: {
+        'line-color': '#EF4444', // Red for excluded
+        'line-width': 1.5,
+        'line-dasharray': [1, 2]
+      }
+    });
+    
+    // Update active layers
+    setActiveLayers(prev => [...prev, layerId]);
+  };
+
+  const fitMapToLocations = (coordinates: [number, number][]) => {
+    if (!map.current || coordinates.length === 0) {
+      console.warn("Cannot fit map to locations: Map not initialized or coordinates empty");
+      return;
+    }
+    
+    console.log(`Fitting map to ${coordinates.length} coordinates`);
+    
+    try {
+      // Create a bounding box from all coordinates
+      const bounds = coordinates.reduce((bbox, coord) => {
+        return bbox.extend(coord);
+      }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
+      
+      // Add padding to fit the entire view
+      map.current.fitBounds(bounds, {
+        padding: 50,
+        maxZoom: 15
+      });
+    } catch (error) {
+      console.error("Error fitting map to coordinates:", error);
+    }
+  };
+
+  return (
+    <div className={`relative h-full w-full ${className}`}>
+      <div ref={mapContainer} className="absolute inset-0" />
+    </div>
+  );
+};
+
+export default Map;
