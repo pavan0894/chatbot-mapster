@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -369,14 +368,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearAllMarkers();
     clearFilteredLocations();
     
-    if (query.source === 'starbucks') {
-      console.log("Showing Starbucks locations");
-      const starbucksLocations = addStarbucksLocations();
-      fitMapToLocations(starbucksLocations.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate(starbucksLocations);
-      return;
-    }
-    
     const isPropertyInDallas = 
       query.source === 'property' && 
       event.detail.isDallasQuery === true;
@@ -453,7 +444,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             return { bg: '#4D148C', border: '#FF6600' };
           case 'starbucks':
             return { bg: '#00704A', border: '#ffffff' };
-          default: // property
+          default:
             return { bg: '#333', border: '#fff' };
         }
       };
@@ -553,8 +544,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         closeOnClick: true
       }).setHTML(`
         <div style="padding: 8px; max-width: 200px;">
-          <h3 style="font-weight: bold; margin-bottom: 5px; ${
-            textColor ? `color: ${textColor};` : ''
+          <h3 style="font-weight: bold; margin-bottom: 5px; ${ 
+            textColor ? `color: ${textColor};` : '' 
           }">${location.name}</h3>
           <p style="margin: 0;">${location.description}</p>
         </div>
