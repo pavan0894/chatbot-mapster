@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -682,14 +681,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
     
     // Handle multi-target queries (properties near BOTH FedEx AND Starbucks)
-    if (query.isMultiTargetQuery) {
-      console.log("Processing multi-target query:", query.multiTargetDetails);
+    if (query.multiTargetQuery) {
+      console.log("Processing multi-target query:", query.multiTargetQuery);
       
-      if (query.multiTargetDetails && query.multiTargetDetails.targetTypes) {
+      if (query.multiTargetQuery && query.multiTargetQuery.targetTypes) {
         const targetData = [];
         
         // Process FedEx locations if needed
-        const fedExTarget = query.multiTargetDetails.targetTypes.find(t => t.type === 'fedex');
+        const fedExTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'fedex');
         if (fedExTarget) {
           targetData.push({
             type: 'fedex' as const,
@@ -699,7 +698,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
         
         // Process Starbucks locations if needed
-        const starbucksTarget = query.multiTargetDetails.targetTypes.find(t => t.type === 'starbucks');
+        const starbucksTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'starbucks');
         if (starbucksTarget) {
           targetData.push({
             type: 'starbucks' as const,
@@ -724,7 +723,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             // Add FedEx markers if part of query
             if (fedExTarget) {
               const fedExConnections = connections.filter(c => c.targetType === 'fedex');
-              const uniqueFedExLocations = new Map<string, LocationWithCoordinates>();
+              const uniqueFedExLocations = new Map();
               
               fedExConnections.forEach(conn => {
                 const fedLoc = fedExLocations.find(f => 
@@ -744,7 +743,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             // Add Starbucks markers if part of query
             if (starbucksTarget) {
               const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
-              const uniqueStarbucksLocations = new Map<string, LocationWithCoordinates>();
+              const uniqueStarbucksLocations = new Map();
               
               starbucksConnections.forEach(conn => {
                 const sbLoc = STARBUCKS_LOCATIONS.find(s => 
