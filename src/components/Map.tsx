@@ -4,7 +4,6 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT, COMPLEX_QUERY_EVENT, MULTI_TARGET_QUERY_EVENT, LocationSourceTarget } from './Chatbot';
 import { 
   findLocationsWithinRadius, 
-  LocationWithCoordinates, 
   checkAndRemoveLayers, 
   findPropertiesWithMultiTargetProximity,
   getCoordinates,
@@ -13,6 +12,7 @@ import {
   parseComplexSpatialQuery,
   calculateDistance
 } from '@/utils/mapUtils';
+import type { LocationWithCoordinates } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
@@ -100,6 +100,7 @@ function getFedExLocations(): LocationWithCoordinates[] {
 }
 
 export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
+export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
 
 export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
   console.log("Emitting map results update with properties:", properties);
@@ -261,9 +262,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log("Setting up map event listeners");
     
-    const handleLocationQuery = (e: CustomEvent) => {
-      console.log("Map received location query event:", e.detail);
-      const query = e.detail as LocationQuery;
+    const handleLocationQuery = (e: Event) => {
+      console.log("Map received location query event:", (e as CustomEvent).detail);
+      const query = (e as CustomEvent).detail as LocationQuery;
       setCurrentQuery(query);
       
       clearAllMarkers();
@@ -338,9 +339,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     };
     
-    const handleComplexQuery = (e: CustomEvent) => {
-      console.log("Map received complex query event:", e.detail);
-      const query = e.detail as LocationQuery;
+    const handleComplexQuery = (e: Event) => {
+      console.log("Map received complex query event:", (e as CustomEvent).detail);
+      const query = (e as CustomEvent).detail as LocationQuery;
       
       if (!query.complexSpatialQuery) {
         console.error("Received complex query event but no complexSpatialQuery data");
@@ -422,9 +423,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       emitResultsUpdate(result.resultLocations);
     };
     
-    const handleMultiTargetQuery = (e: CustomEvent) => {
-      console.log("Map received multi-target query event:", e.detail);
-      const query = e.detail as LocationQuery;
+    const handleMultiTargetQuery = (e: Event) => {
+      console.log("Map received multi-target query event:", (e as CustomEvent).detail);
+      const query = (e as CustomEvent).detail as LocationQuery;
       
       if (!query.multiTargetQuery) {
         console.error("Received multi-target query event but no multiTargetQuery data");
@@ -510,9 +511,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       emitResultsUpdate(result.resultProperties);
     };
     
-    const handleDynamicQuery = (e: CustomEvent) => {
-      console.log("Map received dynamic query event:", e.detail);
-      const query = e.detail as LocationQuery;
+    const handleDynamicQuery = (e: Event) => {
+      console.log("Map received dynamic query event:", (e as CustomEvent).detail);
+      const query = (e as CustomEvent).detail as LocationQuery;
       
       if (!query.dynamicQuery) {
         console.error("Received dynamic query event but no dynamicQuery data");
@@ -629,16 +630,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     };
     
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
-    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     
     return () => {
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
-      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     };
   }, [mapInitialized, visibleLocationTypes]);
 

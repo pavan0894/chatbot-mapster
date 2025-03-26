@@ -2,8 +2,8 @@
 // Main entry point for map utilities - re-exports all functionality
 
 // Re-export core utility types and functions
+export type { LocationWithCoordinates } from './mapCore';
 export { 
-  LocationWithCoordinates,
   toRadians,
   calculateDistance,
   getCoordinates,
