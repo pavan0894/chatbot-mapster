@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -368,6 +369,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       let el;
       
       if (locationType === 'property') {
+        // Create static property markers that won't move with map interaction
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
         el.style.width = '14px';
@@ -436,11 +438,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         </div>
       `);
       
+      // Create marker with fixed configuration for property pins
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: locationType === 'property' ? 'bottom' : 'center',
-        pitchAlignment: 'viewport',
-        rotationAlignment: 'viewport'
+        pitchAlignment: 'map',           // Keep orientation fixed relative to map
+        rotationAlignment: 'map',        // Keep rotation fixed relative to map
+        rotation: 0,                     // Ensure no rotation is applied
+        offset: [0, 0]                   // No offset to keep exact positioning
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
