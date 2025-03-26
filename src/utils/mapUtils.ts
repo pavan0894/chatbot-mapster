@@ -385,9 +385,9 @@ export function findPropertiesWithMultiTargetProximity(
  */
 export function parseMultiTargetQuery(query: string): {
   targetTypes: {
-    type: string,
-    radius: number
-  }[]
+    type: LocationSourceTarget;
+    radius: number;
+  }[];
 } | null {
   const queryLower = query.toLowerCase();
   
@@ -418,8 +418,8 @@ export function parseMultiTargetQuery(query: string): {
         const radius2 = parseInt(match[3], 10);
         
         if (type1 && type2) {
-          targetTypes.push({ type: type1, radius: radius1 });
-          targetTypes.push({ type: type2, radius: radius2 });
+          targetTypes.push({ type: type1 as LocationSourceTarget, radius: radius1 });
+          targetTypes.push({ type: type2 as LocationSourceTarget, radius: radius2 });
           return { targetTypes };
         }
       }
@@ -433,8 +433,8 @@ export function parseMultiTargetQuery(query: string): {
   if (fedexRadius > 0 && starbucksRadius > 0) {
     return {
       targetTypes: [
-        { type: 'fedex', radius: fedexRadius },
-        { type: 'starbucks', radius: starbucksRadius }
+        { type: 'fedex' as LocationSourceTarget, radius: fedexRadius },
+        { type: 'starbucks' as LocationSourceTarget, radius: starbucksRadius }
       ]
     };
   }
@@ -465,8 +465,8 @@ function extractRadiusForType(query: string, type: string): number {
   return 0;
 }
 
-// Helper function to normalize location type names
-function normalizeLocationType(type: string): string | null {
+// Helper function to normalize location type names with proper typing
+function normalizeLocationType(type: string): LocationSourceTarget | null {
   type = type.toLowerCase();
   
   if (type.includes('fedex') || type.includes('fed') || type.includes('express')) {
