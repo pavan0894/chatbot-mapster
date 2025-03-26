@@ -131,7 +131,7 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
   try {
     // Replace this with your actual API endpoint if connected to a backend
     // Currently simulating a delayed response from OpenAI
-    const systemPrompt = "You are a helpful map assistant. You can provide information about locations, directions, and places. Keep responses concise and focused on map-related questions.";
+    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations and industrial properties. Provide concise information about locations, distances between FedEx centers and properties, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map.";
     
     // Add system message if not already included
     if (!messages.some(msg => msg.role === 'system')) {
@@ -151,60 +151,131 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
         
         let responseText = '';
         
+        // Analyze the user's query to understand what they're looking for
+        const hasFedEx = lastUserMessage.includes('fedex');
+        const hasProperty = lastUserMessage.includes('propert') || lastUserMessage.includes('warehouse') || 
+                          lastUserMessage.includes('industrial') || lastUserMessage.includes('logistics');
+        const hasDistance = lastUserMessage.includes('mile') || lastUserMessage.includes('within') || 
+                          lastUserMessage.includes('near') || lastUserMessage.includes('close');
+        const hasQuestion = lastUserMessage.includes('?') || lastUserMessage.includes('where') || 
+                          lastUserMessage.includes('show') || lastUserMessage.includes('find');
+        
+        // Extract location information
+        let mentionedArea = '';
+        for (const area of LOCATION_AREAS) {
+          if (lastUserMessage.includes(area.toLowerCase())) {
+            mentionedArea = area;
+            break;
+          }
+        }
+        
+        // Extract radius information
+        let mentionedRadius = 5; // Default radius
+        const radiusMatch = lastUserMessage.match(/(\d+)\s*(mile|miles|mi)/);
+        if (radiusMatch) {
+          mentionedRadius = parseInt(radiusMatch[1]);
+        }
+        
         // Check if this is a follow-up question
         if (isFollowUp && lastUserMessage.length < 60 && !lastUserMessage.includes('hello') && !lastUserMessage.includes('hi')) {
           // Handle as a follow-up
-          const previousContext = userMessages.slice(-3, -1).join(' ');
           const suggestions = generateSuggestedQuestions(messages);
           
           if (lastUserMessage.includes('more') || lastUserMessage.includes('other') || lastUserMessage.includes('another')) {
             // User asking for more options or alternatives
-            responseText = "Here are some alternative locations I found based on your previous questions:\n\n" +
-              "- Several FedEx Ground facilities are located near major highways for easy access\n" +
-              "- Industrial properties in North Dallas have more FedEx Express centers nearby\n" +
-              "- The Mesquite area has a growing number of logistics hubs within 3 miles of FedEx locations\n\n" +
-              "Would you like to explore any of these areas in more detail?";
+            responseText = "Here are some alternative locations I found based on your search:\n\n" +
+              `- There are ${mentionedRadius > 3 ? 'several' : 'a few'} FedEx Ground facilities near major highways for easy access\n` +
+              `- ${mentionedArea ? mentionedArea : 'The Dallas area'} has ${Math.floor(Math.random() * 5) + 2} industrial properties near FedEx Express centers\n` +
+              "- Would you like to see the specific locations on the map?";
           } else if (lastUserMessage.includes('detail') || lastUserMessage.includes('tell me more')) {
             // User asking for more details
-            responseText = "Looking at the details of locations shown on the map:\n\n" +
-              "- Most FedEx facilities in this area operate 24/7 for package processing\n" +
-              "- The industrial properties near FedEx locations typically have better highway access\n" +
-              "- Recent development has increased warehouse availability within 3 miles of FedEx centers\n\n" +
-              "Is there a specific aspect of these locations you'd like to know more about?";
+            responseText = `Looking at the details of the ${hasFedEx ? 'FedEx locations' : 'industrial properties'} on the map:\n\n` +
+              `- Most ${hasFedEx ? 'FedEx facilities' : 'industrial properties'} in this area have excellent highway access\n` +
+              `- The industrial properties near FedEx locations typically offer larger warehouse spaces\n` +
+              `- Recent development has increased availability within ${mentionedRadius} miles of the major transportation hubs\n\n` +
+              "Would you like me to highlight a specific type of property or FedEx service?";
+          } else if (hasFedEx && hasProperty && hasDistance) {
+            // Specific relationship query
+            responseText = `I've updated the map to show the relationship between ${hasProperty ? 'industrial properties' : ''} ${hasProperty && hasFedEx ? 'and' : ''} ${hasFedEx ? 'FedEx locations' : ''} within ${mentionedRadius} miles${mentionedArea ? ' in the ' + mentionedArea + ' area' : ''}.\n\n` +
+                          "You can see the connections between locations and the distances displayed on the map. Would you like to adjust the search radius or focus on a different area?";
           } else {
-            // Generic follow-up handling
-            responseText = "Based on your questions, I've updated the map to show the requested locations. " +
+            // Generic follow-up handling with contextual awareness
+            responseText = "I've updated the map based on your request. " +
               "You might also be interested in these related questions:\n\n" + 
-              suggestions.slice(0, 3).map(q => `- ${q}`).join('\n');
+              suggestions.slice(0, 3).map(q => `- ${q}`).join('\n') + 
+              "\n\nOr you can ask me to adjust the current view by specifying a different radius or location area.";
           }
         } else if (lastUserMessage.includes('hello') || lastUserMessage.includes('hi')) {
           // Include suggested questions in the greeting
           const suggestions = generateSuggestedQuestions();
-          responseText = "Hello! I'm your AI map assistant. How can I help you navigate or find locations today? Here are some questions you might want to ask:\n\n" + 
-            suggestions.map(q => `- ${q}`).join('\n');
+          responseText = "Hello! I'm your AI map assistant for FedEx and industrial property locations. I can help you find:\n\n" + 
+            "- FedEx locations in specific areas\n" +
+            "- Industrial properties near FedEx centers\n" +
+            "- Distance relationships between properties and FedEx locations\n\n" +
+            "Here are some questions you might want to ask:\n\n" + 
+            suggestions.slice(0, 3).map(q => `- ${q}`).join('\n');
+        } else if (hasFedEx && !hasProperty && !hasDistance) {
+          // Simple FedEx location query
+          responseText = "I've updated the map to show all FedEx locations" + 
+            (mentionedArea ? ` in the ${mentionedArea} area.` : " in the Dallas area.") +
+            "\n\nThe map includes FedEx Ship Centers, Office locations, and Ground facilities. " +
+            "You can click on any marker for more details about that location." +
+            "\n\nWould you like to see industrial properties near these FedEx locations as well?";
+        } else if (!hasFedEx && hasProperty && !hasDistance) {
+          // Simple property location query
+          responseText = "I've updated the map to show industrial properties" + 
+            (mentionedArea ? ` in the ${mentionedArea} area.` : " in the Dallas area.") +
+            "\n\nThe map includes logistics facilities, warehouses, and distribution centers. " +
+            "You can click on any marker for more details about that property." +
+            "\n\nWould you like to see FedEx locations near these properties as well?";
+        } else if (hasFedEx && hasProperty && hasDistance) {
+          // Relationship query between FedEx and properties
+          const isPropertyNearFedEx = lastUserMessage.includes('propert') && 
+                                    lastUserMessage.indexOf('propert') < lastUserMessage.indexOf('fedex');
+          
+          responseText = `I've updated the map to show ${isPropertyNearFedEx ? 
+            'industrial properties' : 'FedEx locations'} within ${mentionedRadius} miles of ${isPropertyNearFedEx ? 
+            'FedEx locations' : 'industrial properties'}${mentionedArea ? ' in the ' + mentionedArea + ' area' : ''}.\n\n` +
+            "The connected lines show the distance between each matched pair. You can click on any marker for more details.";
         } else if (lastUserMessage.includes('dallas')) {
-          responseText = "Dallas is a major city in Texas, located at coordinates -96.7970, 32.7767. It's known for its modern skyline, museums, and vibrant culture. The map is currently centered on this area. Would you like to know about:\n\n" +
-            "- FedEx locations in downtown Dallas?\n" +
-            "- Industrial properties near North Dallas?\n" +
-            "- Distribution centers within 2 miles of FedEx Ground facilities?";
+          // Location-specific query for Dallas
+          responseText = "Dallas is a major city in Texas with numerous industrial properties and FedEx facilities. The map is currently showing the Dallas area. You can ask about:\n\n" +
+            "- FedEx locations in downtown Dallas\n" +
+            "- Industrial properties in North Dallas\n" +
+            "- Distribution centers within 2 miles of FedEx Ground facilities\n" +
+            "- Warehouses near FedEx Express centers in Dallas";
         } else if (lastUserMessage.includes('direction') || lastUserMessage.includes('how to get')) {
-          responseText = "To get directions between two points, you can specify your starting location and destination. Would you like me to show you a route to a specific place from your current location? For example:\n\n" +
-            "- What's the route from Dallas Logistics Hub to the nearest FedEx Express center?\n" +
-            "- How do I get from Southport Logistics Park to FedEx Ground in Garland?";
+          // Directions query
+          responseText = "To get directions between locations, you can specify your starting point and destination. For example:\n\n" +
+            "- How do I get from Dallas Logistics Hub to the nearest FedEx Express center?\n" +
+            "- What's the route from Southport Logistics Park to FedEx Ground in Garland?\n\n" +
+            "You can also specify if you're looking for the fastest route or want to avoid highways.";
         } else if (lastUserMessage.includes('suggest') || lastUserMessage.includes('what can')) {
+          // Suggestions request
           const suggestions = generateSuggestedQuestions(messages);
           responseText = "Here are some questions you can ask about FedEx locations and industrial properties:\n\n" + 
             suggestions.map(q => `- ${q}`).join('\n');
         } else if (lastUserMessage.includes('thank')) {
+          // Thank you response
           responseText = "You're welcome! Feel free to ask any other questions about FedEx locations or industrial properties on the map. Would you like to see:\n\n" +
             `- ${generatePropertyNearFedExQuestion()}\n` +
             `- ${generateFedExNearPropertyQuestion()}`;
+        } else if (hasQuestion) {
+          // General question handling
+          responseText = "I'm analyzing your question about " + 
+            (hasFedEx ? "FedEx locations" : "") + 
+            (hasFedEx && hasProperty ? " and " : "") + 
+            (hasProperty ? "industrial properties" : "") +
+            (mentionedArea ? ` in the ${mentionedArea} area` : "") + 
+            ".\n\n" +
+            "The map has been updated to show the relevant locations. You can zoom in/out or click on markers for more details." +
+            "\n\nCan I help you refine this search or answer specific questions about the displayed locations?";
         } else {
-          // Default response with dynamic suggestions based on conversation history
+          // Default response with dynamic suggestions
           const suggestions = generateSuggestedQuestions(messages).slice(0, 3);
-          responseText = "I'm here to help with map-related questions about FedEx locations and industrial properties. You might want to try asking:\n\n" + 
+          responseText = "I can help you find FedEx locations and industrial properties on the map. Try asking:\n\n" + 
             suggestions.map(q => `- ${q}`).join('\n') + 
-            "\n\nOr you can ask about specific properties or FedEx centers in the Dallas area.";
+            "\n\nYou can specify locations, distances, and relationship types in your questions.";
         }
         
         resolve({ text: responseText });

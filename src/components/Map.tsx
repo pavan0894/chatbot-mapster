@@ -1,8 +1,9 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
-import { findLocationsWithinRadius, LocationWithCoordinates } from '@/utils/mapUtils';
+import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers } from '@/utils/mapUtils';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
@@ -244,7 +245,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const addFedExLocations = () => {
     if (!map.current) {
       console.error("Map not initialized when adding FedEx locations");
-      return;
+      return [];
     }
     
     const locations = loadFedExLocations();
@@ -304,7 +305,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // Clear all existing markers and layers first
+    // Clear all existing markers and layers first - Order matters here!
     clearAllMarkers();
     clearFilteredLocations();
     
@@ -362,7 +363,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       if (connections.length === 0) {
         console.log("No locations found within the radius");
-        emitResultsUpdate([]); // Empty results
+        emitResultsUpdate([]);
         return;
       }
       
@@ -474,15 +475,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    if (map.current.getSource('connections')) {
-      activeLayers.forEach(layerId => {
-        if (map.current && map.current.getLayer(layerId)) {
-          map.current.removeLayer(layerId);
-        }
-      });
-      map.current.removeSource('connections');
-    }
+    // First, ensure any existing connections are removed properly
+    const layerIds = ['connections-layer', 'connections-labels'];
+    checkAndRemoveLayers(map.current, layerIds, 'connections');
     
+    // Now add the new source and layers
     map.current.addSource('connections', {
       type: 'geojson',
       data: {
@@ -564,14 +561,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   const clearFilteredLocations = () => {
     if (map.current) {
-      activeLayers.forEach(layerId => {
-        if (map.current && map.current.getLayer(layerId)) {
-          map.current.removeLayer(layerId);
+      // Make sure to remove layers before removing the source
+      if (activeLayers.length > 0) {
+        activeLayers.forEach(layerId => {
+          if (map.current && map.current.getLayer(layerId)) {
+            map.current.removeLayer(layerId);
+          }
+        });
+        
+        // After removing all layers, it's safe to remove the source
+        if (map.current.getSource('connections')) {
+          map.current.removeSource('connections');
         }
-      });
-      
-      if (map.current.getSource('connections')) {
-        map.current.removeSource('connections');
       }
     }
     
@@ -585,7 +586,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
     
     console.log("Resetting map");
-    clearFilteredLocations();
+    
+    // First remove layers, then markers
+    if (activeLayers.length > 0) {
+      activeLayers.forEach(layerId => {
+        if (map.current && map.current.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+      });
+      
+      if (map.current.getSource('connections')) {
+        map.current.removeSource('connections');
+      }
+      
+      setActiveLayers([]);
+    }
+    
     clearAllMarkers();
     
     map.current.flyTo({

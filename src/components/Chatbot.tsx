@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
-import { getAIResponse, ChatMessageData } from '@/services/openaiService';
+import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
 
 export type LocationSourceTarget = 'fedex' | 'property';
@@ -50,7 +50,9 @@ function isLocationQuery(message: string): LocationQuery | null {
     /locate\s+(?:all\s+)?fedex/i,
     /display\s+(?:all\s+)?fedex/i,
     /fedex\s+locations/i,
-    /fedex\s+(?:near|close|around)/i
+    /fedex\s+(?:near|close|around)/i,
+    /about\s+fedex/i,
+    /fedex.+\?/i
   ];
   
   const propertyPatterns = [
@@ -68,7 +70,9 @@ function isLocationQuery(message: string): LocationQuery | null {
     
     // Query patterns
     /where\s+(?:are|is)\s+(?:the\s+)?(?:industrial\s+)?properties/i,
-    /show\s+(?:me\s+)?(?:all\s+)?(?:industrial\s+)?properties/i
+    /show\s+(?:me\s+)?(?:all\s+)?(?:industrial\s+)?properties/i,
+    /about\s+(?:industrial\s+)?properties/i,
+    /properties.+\?/i
   ];
   
   // Check for FedEx mentions
@@ -84,47 +88,69 @@ function isLocationQuery(message: string): LocationQuery | null {
     radius = parseInt(radiusMatch[1], 10);
   }
   
-  // Specific request for showing FedEx locations (highest priority)
-  if (hasFedEx && !hasProperty) {
+  // Check for questions about "all" FedEx or properties
+  const askingForAll = /show\s+(?:me\s+)?all|where\s+(?:are|is)\s+all|find\s+all|display\s+all|list\s+all/i.test(message);
+  
+  // Check for distance/proximity terms
+  const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
+  
+  // If explicitly asking for all FedEx locations
+  if (hasFedEx && (askingForAll || !hasProximity) && !hasProperty) {
     console.log("Detected request for FedEx locations");
     return { source: 'fedex' as LocationSourceTarget, radius };
   }
   
-  // If only properties are mentioned, return property source
-  if (!hasFedEx && hasProperty) {
+  // If explicitly asking for all properties
+  if (hasProperty && (askingForAll || !hasProximity) && !hasFedEx) {
     console.log("Detected request for property locations");
     return { source: 'property' as LocationSourceTarget, radius };
   }
   
-  // If both FedEx and properties are mentioned, determine the relationship
+  // If both FedEx and properties are mentioned
   if (hasFedEx && hasProperty) {
-    // Attempt to determine relationship direction
-    const fedExNearProperty = /fedex\s+(?:near|close\s+to|within|around)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message);
-    const propertyNearFedEx = /(?:propert|warehouse|industrial|facilit).*\s+(?:near|close\s+to|within|around)\s+.*fedex/i.test(message);
-    
-    if (fedExNearProperty) {
-      console.log("Detected request for FedEx locations near properties");
-      return {
-        source: 'fedex' as LocationSourceTarget,
-        target: 'property' as LocationSourceTarget,
-        radius
-      };
-    } else if (propertyNearFedEx) {
-      console.log("Detected request for properties near FedEx locations");
-      return {
-        source: 'property' as LocationSourceTarget,
-        target: 'fedex' as LocationSourceTarget,
-        radius
-      };
-    } else {
-      // Default relationship when both are mentioned but relationship is unclear
-      console.log("Detected both FedEx and properties, defaulting to properties near FedEx");
-      return {
-        source: 'property' as LocationSourceTarget,
-        target: 'fedex' as LocationSourceTarget,
-        radius
-      };
+    // If proximity terms found, determine relationship direction
+    if (hasProximity) {
+      // Check which entity is being asked about in relation to the other
+      const fedExNearProperty = /fedex\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message) ||
+                              /(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit).*fedex/i.test(message);
+      
+      const propertyNearFedEx = /(?:propert|warehouse|industrial|facilit).*\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex/i.test(message) ||
+                              /(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex.*(?:propert|warehouse|industrial|facilit)/i.test(message);
+      
+      if (fedExNearProperty) {
+        console.log("Detected request for FedEx locations near properties");
+        return {
+          source: 'fedex' as LocationSourceTarget,
+          target: 'property' as LocationSourceTarget,
+          radius
+        };
+      } else if (propertyNearFedEx) {
+        console.log("Detected request for properties near FedEx locations");
+        return {
+          source: 'property' as LocationSourceTarget,
+          target: 'fedex' as LocationSourceTarget,
+          radius
+        };
+      }
     }
+    
+    // Default relationship when both are mentioned but relationship is unclear
+    console.log("Detected both FedEx and properties, defaulting to properties near FedEx");
+    return {
+      source: 'property' as LocationSourceTarget,
+      target: 'fedex' as LocationSourceTarget,
+      radius
+    };
+  }
+  
+  // If no strong location query is detected but FedEx is mentioned, assume basic FedEx query
+  if (hasFedEx) {
+    return { source: 'fedex' as LocationSourceTarget, radius };
+  }
+  
+  // If no strong location query is detected but property is mentioned, assume basic property query
+  if (hasProperty) {
+    return { source: 'property' as LocationSourceTarget, radius };
   }
   
   // If it's not a location query we recognize
@@ -146,7 +172,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
-      text: "Welcome to MapChat! I can help you find FedEx locations and industrial properties. Try asking questions like:\n\n- Show all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
+      text: "Welcome to MapChat! I can help you find FedEx locations and industrial properties. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
       sender: 'bot',
       timestamp: new Date()
     };
@@ -186,113 +212,91 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     console.log("Location query detected in Chatbot:", locationQuery);
 
     // Create a temporary processing message
-    let processingMessage: MessageType;
-    
-    if (locationQuery) {
-      processingMessage = {
-        id: `processing-${msgId}`,
-        text: locationQuery.source === 'fedex' ? 
+    const processingMessage: MessageType = {
+      id: `processing-${msgId}`,
+      text: locationQuery ? 
+        (locationQuery.source === 'fedex' ? 
           "Searching for FedEx locations..." : 
-          "Searching for industrial properties...",
-        sender: 'bot',
-        timestamp: new Date()
-      };
-    } else {
-      processingMessage = {
-        id: `processing-${msgId}`,
-        text: "Processing your request...",
-        sender: 'bot',
-        timestamp: new Date()
-      };
-    }
+          "Searching for industrial properties...") :
+        "Processing your request...",
+      sender: 'bot',
+      timestamp: new Date()
+    };
     
     setMessages(prevMessages => [...prevMessages, processingMessage]);
 
-    if (locationQuery) {
-      // Log the query details before dispatching the event
-      console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
-      
-      // Create and dispatch the custom event with proper detail
-      const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
-        detail: locationQuery,
-        bubbles: true,
-        cancelable: true
-      });
-      
-      // Explicitly dispatch event from window
-      window.dispatchEvent(event);
-      console.log("Location query event dispatched");
-      
-      // Convert messages to format expected by AI service
-      const messageHistory: ChatMessageData[] = messages
-        .filter(msg => msg.id !== `processing-${msgId}`)
-        .map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        }));
-      
-      // Add current user message
-      messageHistory.push({
-        role: 'user',
-        content: input
-      });
-      
-      try {
-        // Get AI response
-        const response = await getAIResponse(messageHistory);
+    // Convert messages to format expected by AI service
+    const messageHistory: ChatMessageData[] = messages
+      .filter(msg => msg.id !== `processing-${msgId}`)
+      .map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.text
+      }));
+    
+    // Add current user message
+    messageHistory.push({
+      role: 'user',
+      content: input
+    });
+    
+    try {
+      // If this is a location query, trigger the map update event
+      if (locationQuery) {
+        // Log the query details before dispatching the event
+        console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
         
-        // Replace processing message with actual response
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg.id === `processing-${msgId}` 
-              ? { ...msg, id: `response-${msgId}`, text: response.text } 
-              : msg
-          )
-        );
+        // Create and dispatch the custom event with proper detail
+        const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
+          detail: locationQuery,
+          bubbles: true,
+          cancelable: true
+        });
         
-        if (response.error) {
-          toast({
-            title: "Error",
-            description: "Sorry, I couldn't process your request. Please try again.",
-            variant: "destructive"
-          });
-        }
-      } catch (error) {
-        console.error("Error getting AI response:", error);
-        
-        // Replace processing message with error message
-        setMessages(prevMessages => 
-          prevMessages.map(msg => 
-            msg.id === `processing-${msgId}` 
-              ? { 
-                  ...msg, 
-                  id: `error-${msgId}`, 
-                  text: "I encountered an error processing your request. Please try a different question." 
-                } 
-              : msg
-          )
-        );
-        
+        // Explicitly dispatch event from window
+        window.dispatchEvent(event);
+        console.log("Location query event dispatched");
+      }
+      
+      // Get AI response
+      const response = await getAIResponse(messageHistory);
+      
+      // Replace processing message with actual response
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === `processing-${msgId}` 
+            ? { ...msg, id: `response-${msgId}`, text: response.text } 
+            : msg
+        )
+      );
+      
+      if (response.error) {
         toast({
           title: "Error",
-          description: "Failed to get a response. Please try again.",
+          description: "Sorry, I couldn't process your request. Please try again.",
           variant: "destructive"
         });
       }
-    } else {
-      // For non-location queries, provide a helpful message
-      const helpMessage: MessageType = {
-        id: `help-${msgId}`,
-        text: "I can help with location-based questions about FedEx centers and industrial properties. Try asking about:\n\n- FedEx locations in a specific area\n- Industrial properties near FedEx centers\n- Properties within a certain distance of FedEx\n- Specific FedEx services or property types",
-        sender: 'bot',
-        timestamp: new Date()
-      };
+    } catch (error) {
+      console.error("Error getting AI response:", error);
       
+      // Replace processing message with error message
       setMessages(prevMessages => 
         prevMessages.map(msg => 
-          msg.id === `processing-${msgId}` ? helpMessage : msg
+          msg.id === `processing-${msgId}` 
+            ? { 
+                ...msg, 
+                id: `error-${msgId}`, 
+                text: "I encountered an error processing your request. Please try a different question." 
+              } 
+            : msg
         )
       );
+      
+      toast({
+        title: "Error",
+        description: "Failed to get a response. Please try again.",
+        variant: "destructive"
+      });
     }
 
     // Clear input and reset processing state
@@ -305,6 +309,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     if (event.key === 'Enter') {
       sendMessage();
     }
+  };
+
+  // Function to handle suggestion clicks
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
+    setTimeout(() => sendMessage(), 100);
   };
 
   return (
@@ -324,6 +334,26 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
                   <span></span>
                 </div>
                 <span className="text-sm">Thinking...</span>
+              </div>
+            )}
+            
+            {/* Suggestions (shown after user gets replies from the bot) */}
+            {messages.length > 1 && !isProcessing && (
+              <div className="flex flex-wrap gap-2 mt-4">
+                {generateSuggestedQuestions(messages.filter(m => m.id !== 'welcome').map(m => ({
+                  role: m.sender === 'user' ? 'user' : 'assistant',
+                  content: m.text
+                }))).slice(0, 3).map((suggestion, index) => (
+                  <Button 
+                    key={`suggestion-${index}`} 
+                    variant="outline" 
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                  >
+                    {suggestion.length > 60 ? suggestion.substring(0, 57) + '...' : suggestion}
+                  </Button>
+                ))}
               </div>
             )}
           </div>
