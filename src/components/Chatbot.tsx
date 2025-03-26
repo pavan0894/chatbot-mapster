@@ -1,10 +1,13 @@
-import React, { useState, useCallback, useEffect } from 'react';
+
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
+import { getAIResponse, ChatMessageData } from '@/services/openaiService';
+import ChatMessage, { MessageType } from './ChatMessage';
 
 export type LocationSourceTarget = 'fedex' | 'property';
 
@@ -88,15 +91,50 @@ interface ChatbotProps {
 }
 
 const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<MessageType[]>([]);
   const [input, setInput] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const { toast } = useToast();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  // Welcome message
+  useEffect(() => {
+    const welcomeMessage: MessageType = {
+      id: 'welcome',
+      text: "Welcome to MapChat! I can help you find FedEx locations and industrial properties. Try asking questions like:\n\n- Show all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
+      sender: 'bot',
+      timestamp: new Date()
+    };
+    setMessages([welcomeMessage]);
+  }, []);
+  
+  // Auto-scroll to the latest message
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
+    }
+  }, [messages]);
 
-  const sendMessage = useCallback(() => {
-    if (!input.trim()) return;
-
+  const sendMessage = useCallback(async () => {
+    if (!input.trim() || isProcessing) return;
+    
+    setIsProcessing(true);
+    
+    // Generate unique ID for message
+    const msgId = Date.now().toString();
+    
     // Add user message
-    setMessages(prevMessages => [...prevMessages, `You: ${input}`]);
+    const userMessage: MessageType = {
+      id: msgId,
+      text: input,
+      sender: 'user',
+      timestamp: new Date()
+    };
+    
+    setMessages(prevMessages => [...prevMessages, userMessage]);
 
     // Check if the message is a location query
     const locationQuery = isLocationQuery(input);
@@ -104,15 +142,89 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     if (locationQuery) {
       // Emit the location query event
       emitLocationQuery(locationQuery);
-      setMessages(prevMessages => [...prevMessages, `MapChat: Searching for locations...`]);
+      
+      // Create a temporary processing message
+      const processingMessage: MessageType = {
+        id: `processing-${msgId}`,
+        text: "Searching for locations...",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prevMessages => [...prevMessages, processingMessage]);
+      
+      // Convert messages to format expected by AI service
+      const messageHistory: ChatMessageData[] = messages
+        .filter(msg => msg.id !== `processing-${msgId}`)
+        .map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text
+        }));
+      
+      // Add current user message
+      messageHistory.push({
+        role: 'user',
+        content: input
+      });
+      
+      try {
+        // Get AI response
+        const response = await getAIResponse(messageHistory);
+        
+        // Replace processing message with actual response
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === `processing-${msgId}` 
+              ? { ...msg, id: `response-${msgId}`, text: response.text } 
+              : msg
+          )
+        );
+        
+        if (response.error) {
+          toast({
+            title: "Error",
+            description: "Sorry, I couldn't process your request. Please try again.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error getting AI response:", error);
+        
+        // Replace processing message with error message
+        setMessages(prevMessages => 
+          prevMessages.map(msg => 
+            msg.id === `processing-${msgId}` 
+              ? { 
+                  ...msg, 
+                  id: `error-${msgId}`, 
+                  text: "I encountered an error processing your request. Please try a different question." 
+                } 
+              : msg
+          )
+        );
+        
+        toast({
+          title: "Error",
+          description: "Failed to get a response. Please try again.",
+          variant: "destructive"
+        });
+      }
     } else {
-      // Handle non-location query messages
-      setMessages(prevMessages => [...prevMessages, `MapChat: I can only help with location-based questions about properties and FedEx locations.`]);
+      // For non-location queries, provide a helpful message
+      const helpMessage: MessageType = {
+        id: `help-${msgId}`,
+        text: "I can help with location-based questions about FedEx centers and industrial properties. Try asking about:\n\n- FedEx locations in a specific area\n- Industrial properties near FedEx centers\n- Properties within a certain distance of FedEx\n- Specific FedEx services or property types",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prevMessages => [...prevMessages, helpMessage]);
     }
 
-    // Clear input
+    // Clear input and reset processing state
     setInput('');
-  }, [input, setMessages, toast]);
+    setIsProcessing(false);
+  }, [input, messages, isProcessing, toast]);
 
   // Handle Enter key press
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -121,30 +233,30 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     }
   };
 
-  // Auto-focus on the input field on component mount
-  useEffect(() => {
-    const inputElement = document.getElementById('chat-input');
-    if (inputElement) {
-      inputElement.focus();
-    }
-  }, []);
-
   return (
-    <Card className={cn("w-full h-full rounded-none", className)}>
+    <Card className={cn("w-full h-full rounded-none flex flex-col", className)}>
       <CardContent className="flex flex-col h-full p-0">
         {/* Chat Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="flex flex-col space-y-2">
-            {messages.map((message, index) => (
-              <p key={index} className="text-sm">
-                {message}
-              </p>
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+          <div className="flex flex-col space-y-4">
+            {messages.map((message) => (
+              <ChatMessage key={message.id} message={message} />
             ))}
+            {isProcessing && (
+              <div className="flex items-center space-x-2 text-muted-foreground">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span className="text-sm">Thinking...</span>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
         {/* Input Area */}
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border mt-auto">
           <div className="flex items-center space-x-2">
             <Input
               id="chat-input"
@@ -154,8 +266,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               className="flex-1"
+              disabled={isProcessing}
             />
-            <Button onClick={sendMessage}>Send</Button>
+            <Button 
+              onClick={sendMessage} 
+              disabled={isProcessing || !input.trim()}
+            >
+              Send
+            </Button>
           </div>
         </div>
       </CardContent>
