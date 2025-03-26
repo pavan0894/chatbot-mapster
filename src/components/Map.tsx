@@ -1,8 +1,7 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT } from './Chatbot';
+import { LOCATION_QUERY_EVENT, LocationQuery, API_QUERY_EVENT, COMPLEX_QUERY_EVENT } from './Chatbot';
 import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
@@ -560,6 +559,128 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
   };
 
+  const handleComplexQuery = (event: CustomEvent<LocationQuery>) => {
+    const query = event.detail;
+    console.log("Complex query received in Map component:", query);
+    
+    if (!map.current || !query.complexQuery) {
+      console.error("Map not initialized or invalid complex query");
+      return;
+    }
+    
+    // Clear previous markers and results
+    clearAllMarkers();
+    clearFilteredLocations();
+    
+    // Reset visible location types
+    const newVisibleTypes: string[] = [];
+    setVisibleLocationTypes(newVisibleTypes);
+    
+    const { includeType, excludeType, includeRadius, excludeRadius } = query.complexQuery;
+    
+    console.log(`Processing complex spatial query: properties within ${includeRadius} miles of ${includeType} and ${excludeRadius} miles away from ${excludeType}`);
+    
+    // Load the required location data
+    let includeLocations: LocationWithCoordinates[] = [];
+    let excludeLocations: LocationWithCoordinates[] = [];
+    
+    // Get the include locations data
+    if (includeType === 'fedex') {
+      includeLocations = loadFedExLocations();
+      newVisibleTypes.push('fedex');
+    } else if (includeType === 'starbucks') {
+      includeLocations = STARBUCKS_LOCATIONS;
+      newVisibleTypes.push('starbucks');
+    }
+    
+    // Get the exclude locations data
+    if (excludeType === 'fedex') {
+      excludeLocations = loadFedExLocations();
+      newVisibleTypes.push('fedex');
+    } else if (excludeType === 'starbucks') {
+      excludeLocations = STARBUCKS_LOCATIONS;
+      newVisibleTypes.push('starbucks');
+    }
+    
+    // Properties are always the main entity we're filtering
+    const properties = INDUSTRIAL_PROPERTIES;
+    newVisibleTypes.push('property');
+    
+    // Display the include and exclude location markers
+    const getMarkerColors = (locationType: string) => {
+      switch(locationType) {
+        case 'fedex':
+          return { bg: '#4D148C', border: '#FF6600' };
+        case 'starbucks':
+          return { bg: '#00704A', border: '#ffffff' };
+        default:
+          return { bg: '#333', border: '#fff' };
+      }
+    };
+    
+    const includeColors = getMarkerColors(includeType);
+    const excludeColors = getMarkerColors(excludeType);
+    
+    // Add the include location markers
+    addFilteredLocations(includeLocations, includeType, includeColors.bg, includeColors.border);
+    
+    // Add the exclude location markers
+    addFilteredLocations(excludeLocations, excludeType, excludeColors.bg, excludeColors.border);
+    
+    setVisibleLocationTypes(newVisibleTypes);
+    
+    // Find properties that meet the complex criteria
+    const withinIncludeRadius = findLocationsWithinRadius(
+      properties,
+      includeLocations,
+      includeRadius
+    ).sourceLocations;
+    
+    // For exclude condition, we first find all properties within the exclude radius,
+    // then we'll remove them from our results
+    const withinExcludeRadius = findLocationsWithinRadius(
+      properties,
+      excludeLocations,
+      excludeRadius
+    ).sourceLocations;
+    
+    // Get properties that are within include radius but not within exclude radius
+    const filteredProperties = withinIncludeRadius.filter(prop => 
+      !withinExcludeRadius.some(excluded => 
+        excluded.name === prop.name
+      )
+    );
+    
+    // Display the filtered properties
+    if (filteredProperties.length > 0) {
+      addFilteredLocations(filteredProperties, 'property', '#333', '#fff');
+      
+      // Fit map to show all relevant markers
+      const allLocations = [...includeLocations, ...excludeLocations, ...filteredProperties];
+      fitMapToLocations(allLocations.map(loc => loc.coordinates as [number, number]));
+      
+      // Emit results update
+      emitResultsUpdate(filteredProperties);
+      emitMapContextUpdate({
+        visibleLocations: newVisibleTypes,
+        query,
+        properties: filteredProperties
+      });
+    } else {
+      console.log("No properties match the complex criteria");
+      // Still fit the map to show the include/exclude locations
+      const locationPoints = [...includeLocations, ...excludeLocations];
+      fitMapToLocations(locationPoints.map(loc => loc.coordinates as [number, number]));
+      
+      emitResultsUpdate([]);
+      emitMapContextUpdate({
+        visibleLocations: newVisibleTypes,
+        query,
+        properties: []
+      });
+    }
+  };
+
   const handleApiQuery = (event: CustomEvent<{query: string}>) => {
     const { query } = event.detail;
     console.log("API query received in Map component:", query);
@@ -793,10 +914,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   useEffect(() => {
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
     window.addEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
     
     return () => {
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
       window.removeEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
     };
   }, []);
