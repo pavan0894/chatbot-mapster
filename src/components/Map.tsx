@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -92,6 +93,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [mapInitialized, setMapInitialized] = useState<boolean>(false);
   const [activeMarkers, setActiveMarkers] = useState<mapboxgl.Marker[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
+  const [hasUserQuery, setHasUserQuery] = useState<boolean>(false);
 
   useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
@@ -129,8 +131,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           'horizon-blend': 0.2,
         });
         
-        addIndustrialProperties();
-        addFedExLocations();
+        // Only add all markers on initial load
+        if (!hasUserQuery) {
+          addIndustrialProperties();
+          addFedExLocations();
+        }
         
         setMapInitialized(true);
       });
@@ -183,7 +188,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     } catch (error) {
       console.error("Error initializing map:", error);
     }
-  }, [mapInitialized]);
+  }, [mapInitialized, hasUserQuery]);
 
   const addIndustrialProperties = () => {
     if (!map.current) {
@@ -283,6 +288,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
+    // Set flag that user has made a query - we'll use this to not display all pins automatically
+    setHasUserQuery(true);
+    
+    // Clear existing markers and layers
     clearFilteredLocations();
     clearAllMarkers();
     
@@ -297,15 +306,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       targetData = query.target === 'fedex' ? FEDEX_LOCATIONS : FEDEX_LOCATIONS;
     }
     
+    // Handle showing all locations of one type
     if (!query.target) {
       if (query.source === 'fedex') {
-        addFedExLocations();
+        addFilteredLocations(FEDEX_LOCATIONS, 'fedex', '#4D148C', '#FF6600');
         fitMapToLocations(FEDEX_LOCATIONS.map(loc => loc.coordinates as [number, number]));
         console.log("Emitting FedEx locations:", FEDEX_LOCATIONS.length);
         emitResultsUpdate(FEDEX_LOCATIONS);
         return;
       } else if (query.source === 'property') {
-        addIndustrialProperties();
+        addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
         fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
         console.log("Emitting Industrial properties:", INDUSTRIAL_PROPERTIES.length);
         emitResultsUpdate(INDUSTRIAL_PROPERTIES);
@@ -313,6 +323,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     }
     
+    // Find locations within the specified radius
     const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
       sourceData,
       targetData,
@@ -323,24 +334,27 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     if (connections.length === 0) {
       console.log("No locations found within the radius");
-      addIndustrialProperties();
-      addFedExLocations();
+      // Don't show any pins if no results found
       emitResultsUpdate([]);
       return;
     }
     
+    // Only add the filtered source locations to the map
     addFilteredLocations(sourceLocations, query.source, 
       query.source === 'fedex' ? '#4D148C' : '#333', 
       query.source === 'fedex' ? '#FF6600' : '#fff');
     
+    // Only add the filtered target locations if specified
     if (query.target) {
       addFilteredLocations(targetLocations, query.target, 
         query.target === 'fedex' ? '#4D148C' : '#333', 
         query.target === 'fedex' ? '#FF6600' : '#fff');
     }
     
+    // Add connection lines between matched locations
     addConnectionLines(connections);
     
+    // Fit map view to show all displayed locations
     fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
       const coords = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
         ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
@@ -348,6 +362,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return coords;
     }));
     
+    // Update the PropertyTable with the filtered results
     if (query.source === 'property') {
       console.log("Emitting source locations (properties):", sourceLocations.length);
       emitResultsUpdate(sourceLocations);
@@ -355,8 +370,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       console.log("Emitting target locations (properties):", targetLocations.length);
       emitResultsUpdate(targetLocations);
     } else {
-      console.log("Default case: emitting all industrial properties");
-      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+      // Default case when neither source nor target is 'property'
+      emitResultsUpdate([]);
     }
   };
 
@@ -557,6 +572,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearFilteredLocations();
     clearAllMarkers();
     
+    // Reset user query flag
+    setHasUserQuery(false);
+    
     map.current.flyTo({
       center: [-96.7970, 32.7767],
       zoom: 9,
@@ -564,6 +582,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       bearing: 0
     });
     
+    // Show all markers on reset
     addIndustrialProperties();
     addFedExLocations();
     
