@@ -6,13 +6,13 @@ import Map from "@/components/Map";
 
 const Index = () => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 h-[100dvh]">
-      <Card className="rounded-none h-full border-r">
+    <div className="flex flex-col lg:flex-row h-[100dvh] w-full overflow-hidden">
+      <div className="w-full lg:w-1/2 h-full border-r border-border">
         <Chatbot />
-      </Card>
-      <Card className="rounded-none h-full border-l">
+      </div>
+      <div className="w-full lg:w-1/2 h-full border-l border-border">
         <Map />
-      </Card>
+      </div>
     </div>
   );
 };
