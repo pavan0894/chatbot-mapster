@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -8,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
+import { parseComplexSpatialQuery } from '@/utils/mapUtils';
 
 export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
 
@@ -17,15 +19,29 @@ export interface LocationQuery {
   radius: number;
   isDallasQuery?: boolean; // Added field to track if this is a Dallas area query
   queryText?: string; // Store the original query text
+  complexQuery?: {
+    includeType: LocationSourceTarget;
+    excludeType: LocationSourceTarget;
+    includeRadius: number;
+    excludeRadius: number;
+  }; // Added field for complex spatial queries
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
 export const API_QUERY_EVENT = 'api-query-event';
+export const COMPLEX_QUERY_EVENT = 'complex-query-event'; // New event for complex spatial queries
 
 // Emit a location query event
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
   const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
+  window.dispatchEvent(event);
+}
+
+// Emit complex query event
+export function emitComplexQueryEvent(query: LocationQuery) {
+  console.log("Emitting complex query event:", query);
+  const event = new CustomEvent(COMPLEX_QUERY_EVENT, { detail: query });
   window.dispatchEvent(event);
 }
 
@@ -39,6 +55,24 @@ export function emitApiQueryEvent(query: string) {
 // Enhanced function to determine if a message is a location query with better Dallas area detection
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
+  
+  // Check for complex spatial query first
+  const complexQuery = parseComplexSpatialQuery(message);
+  if (complexQuery) {
+    console.log("Detected complex spatial query:", complexQuery);
+    return { 
+      source: 'property' as LocationSourceTarget, 
+      radius: complexQuery.includeRadius,
+      isDallasQuery: message.includes('dallas') || message.includes('dfw'),
+      queryText: message,
+      complexQuery: {
+        includeType: complexQuery.includeType as LocationSourceTarget,
+        excludeType: complexQuery.excludeType as LocationSourceTarget,
+        includeRadius: complexQuery.includeRadius,
+        excludeRadius: complexQuery.excludeRadius
+      }
+    };
+  }
   
   // Dallas area detection patterns
   const dallasPatterns = [
@@ -362,7 +396,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
-      text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?",
+      text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?\n- Show me properties within 2 miles of FedEx and 4 miles away from Starbucks",
       sender: 'bot',
       timestamp: new Date()
     };
@@ -424,11 +458,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     const processingMessage: MessageType = {
       id: `processing-${msgId}`,
       text: locationQuery ? 
-        (locationQuery.source === 'fedex' ? 
-          "Searching for FedEx locations..." : 
-          locationQuery.source === 'starbucks' ?
-          "Searching for Starbucks locations..." :
-          "Searching for industrial properties...") :
+        (locationQuery.complexQuery ? 
+          "Processing complex spatial query..." :
+          locationQuery.source === 'fedex' ? 
+            "Searching for FedEx locations..." : 
+            locationQuery.source === 'starbucks' ?
+              "Searching for Starbucks locations..." :
+              "Searching for industrial properties...") :
         "Processing your request...",
       sender: 'bot',
       timestamp: new Date()
@@ -466,13 +502,20 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       if (locationQuery) {
         console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
         
-        const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
-          detail: locationQuery,
-          bubbles: true,
-          cancelable: true
-        });
+        if (locationQuery.complexQuery) {
+          // If it's a complex spatial query, emit the complex query event
+          emitComplexQueryEvent(locationQuery);
+        } else {
+          // For simple location queries, use the existing event
+          const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
+            detail: locationQuery,
+            bubbles: true,
+            cancelable: true
+          });
+          
+          window.dispatchEvent(event);
+        }
         
-        window.dispatchEvent(event);
         console.log("Location query event dispatched");
       } else {
         if (input.includes("?") || 

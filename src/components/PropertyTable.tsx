@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LocationWithCoordinates } from '@/utils/mapUtils';
-import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
+import { LOCATION_QUERY_EVENT, LocationQuery, COMPLEX_QUERY_EVENT } from './Chatbot';
 import { MAP_RESULTS_UPDATE_EVENT } from './Map';
 
 interface PropertyTableProps {
@@ -30,6 +30,21 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
       setProperties([]);
     };
 
+    // Handle complex spatial queries
+    const handleComplexQuery = (e: CustomEvent<LocationQuery>) => {
+      const query = e.detail;
+      console.log("PropertyTable received complex query:", query);
+      
+      if (query.complexQuery) {
+        setQuery(`properties within ${query.complexQuery.includeRadius} miles of ${query.complexQuery.includeType} and ${query.complexQuery.excludeRadius} miles away from ${query.complexQuery.excludeType}`);
+        setIsLoading(true);
+        setHasQueried(true);
+        
+        // Reset properties to avoid showing old results during loading
+        setProperties([]);
+      }
+    };
+
     // Results update event listener
     const handleResultsUpdate = (e: CustomEvent<{properties: LocationWithCoordinates[]}>) => {
       console.log("PropertyTable received results update event:", e.detail);
@@ -47,12 +62,14 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
     
     // Add event listeners with proper type casting
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
     window.addEventListener(MAP_RESULTS_UPDATE_EVENT, handleResultsUpdate as EventListener);
     
     // Cleanup event listeners
     return () => {
       console.log("PropertyTable: Removing event listeners");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
       window.removeEventListener(MAP_RESULTS_UPDATE_EVENT, handleResultsUpdate as EventListener);
     };
   }, []);
