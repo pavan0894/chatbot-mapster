@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -723,7 +724,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             // Add FedEx markers if part of query
             if (fedExTarget) {
               const fedExConnections = connections.filter(c => c.targetType === 'fedex');
-              const uniqueFedExLocations = new Map();
+              // Fix: Use JavaScript Map with explicit type declaration
+              const uniqueFedExLocations = new Map<string, LocationWithCoordinates>();
               
               fedExConnections.forEach(conn => {
                 const fedLoc = fedExLocations.find(f => 
@@ -734,7 +736,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
                 }
               });
               
-              const fedExLocsToShow = Array.from(uniqueFedExLocations.values());
+              // Fix: Convert Map values to array and ensure proper type
+              const fedExLocsToShow = Array.from(uniqueFedExLocations.values()) as LocationWithCoordinates[];
               if (fedExLocsToShow.length > 0) {
                 addFilteredLocations(fedExLocsToShow, 'fedex', '#FF6600', '#ffffff');
               }
@@ -743,7 +746,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             // Add Starbucks markers if part of query
             if (starbucksTarget) {
               const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
-              const uniqueStarbucksLocations = new Map();
+              // Fix: Use JavaScript Map with explicit type declaration
+              const uniqueStarbucksLocations = new Map<string, LocationWithCoordinates>();
               
               starbucksConnections.forEach(conn => {
                 const sbLoc = STARBUCKS_LOCATIONS.find(s => 
@@ -754,7 +758,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
                 }
               });
               
-              const starbucksLocsToShow = Array.from(uniqueStarbucksLocations.values());
+              // Fix: Convert Map values to array and ensure proper type
+              const starbucksLocsToShow = Array.from(uniqueStarbucksLocations.values()) as LocationWithCoordinates[];
               if (starbucksLocsToShow.length > 0) {
                 addFilteredLocations(starbucksLocsToShow, 'starbucks', '#00704A', '#ffffff');
               }
