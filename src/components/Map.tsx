@@ -885,7 +885,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       return {
-        type: 'Feature',
+        type: 'Feature' as const,
         properties: {
           distance: conn.distance,
           description: `Distance: ${conn.distance.toFixed(2)} miles`,
@@ -893,7 +893,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           color: lineColor
         },
         geometry: {
-          type: 'LineString',
+          type: 'LineString' as const,
           coordinates: [conn.source, conn.target]
         }
       };
@@ -948,13 +948,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Create features for connection lines
     const features = connections.map(conn => ({
-      type: 'Feature',
+      type: 'Feature' as const,
       properties: {
         distance: conn.distance,
         description: `Excluded: ${conn.distance.toFixed(2)} miles`
       },
       geometry: {
-        type: 'LineString',
+        type: 'LineString' as const,
         coordinates: [conn.source, conn.target]
       }
     }));
