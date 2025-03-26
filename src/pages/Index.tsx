@@ -8,7 +8,9 @@ import ApiKeyInput from "@/components/ApiKeyInput";
 const Index = () => {
   return (
     <div className="flex flex-col h-[100dvh] w-full overflow-hidden">
-      <ApiKeyInput />
+      <div className="p-2">
+        <ApiKeyInput />
+      </div>
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         <div className="w-full lg:w-1/2 h-full border-r border-border">
           <Chatbot />
