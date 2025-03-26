@@ -212,7 +212,16 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
     
     console.log("Sending to OpenAI:", messages);
 
-    // Make the actual API call to OpenAI
+    // Validate the API key format before sending
+    if (!apiKey.startsWith('sk-')) {
+      console.error("Invalid API key format");
+      return {
+        text: "There's an issue with the API key format. Please ensure it starts with 'sk-'.",
+        error: "Invalid API key format"
+      };
+    }
+
+    // Make the actual API call to OpenAI with proper error handling
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -230,18 +239,55 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
     if (!response.ok) {
       const errorData = await response.json();
       console.error("OpenAI API error:", errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+      
+      // Handle different error types
+      if (errorData.error?.type === 'invalid_request_error') {
+        return {
+          text: "There was an issue with the request to OpenAI. Please try a different query.",
+          error: errorData.error?.message || 'Invalid request'
+        };
+      } else if (errorData.error?.type === 'authentication_error') {
+        return {
+          text: "There was an issue authenticating with OpenAI. Please check your API key.",
+          error: "Authentication error"
+        };
+      } else {
+        return {
+          text: `Error: ${errorData.error?.message || 'Unknown error from OpenAI API'}`,
+          error: errorData.error?.message || 'Unknown error'
+        };
+      }
     }
 
     const data = await response.json();
+    
+    // Ensure we have a valid response
+    if (!data.choices || data.choices.length === 0) {
+      return {
+        text: "Received an empty response from OpenAI. Please try again.",
+        error: "Empty response"
+      };
+    }
+    
     const assistantMessage = data.choices[0].message.content;
-
     return { text: assistantMessage };
+    
   } catch (error) {
     console.error("Error getting AI response:", error);
+    
+    // Provide a more detailed error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+      return {
+        text: "Could not connect to OpenAI. Please check your internet connection and try again.",
+        error: "Network error"
+      };
+    }
+    
     return {
       text: "I encountered an error when trying to process your request. Please check your API key or try again later.",
-      error: error instanceof Error ? error.message : "Unknown error"
+      error: errorMessage
     };
   }
 };
