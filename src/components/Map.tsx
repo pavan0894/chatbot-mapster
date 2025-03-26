@@ -15,6 +15,8 @@ import {
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
+export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
+
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
 const COMPLEX_QUERY_FALLBACK_PROPERTIES: LocationWithCoordinates[] = [
