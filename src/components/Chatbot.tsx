@@ -367,29 +367,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
-
-    // Automatically show properties in Dallas on startup
-    setTimeout(() => {
-      const dallasPropertiesQuery: LocationQuery = {
-        source: 'property',
-        radius: 5,
-        isDallasQuery: true,
-        queryText: "Show me industrial properties in Dallas"
-      };
-      
-      console.log("Auto-showing Dallas properties on startup");
-      emitLocationQuery(dallasPropertiesQuery);
-      
-      // Add a system message about showing Dallas properties
-      const systemMessage: MessageType = {
-        id: 'auto-dallas',
-        text: "I've automatically loaded industrial properties in the Dallas area for you. You can ask specific questions about these properties or view other location types.",
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, systemMessage]);
-    }, 1000);
   }, []);
   
   useEffect(() => {
