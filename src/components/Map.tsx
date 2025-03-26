@@ -439,8 +439,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: locationType === 'property' ? 'bottom' : 'center',
-        pitchAlignment: 'map',
-        rotationAlignment: 'map'
+        pitchAlignment: 'viewport',
+        rotationAlignment: 'viewport'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
