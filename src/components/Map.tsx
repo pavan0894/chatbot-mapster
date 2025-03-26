@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -108,7 +107,7 @@ export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
   console.log("Emitting map results update with properties:", properties);
   const event = new CustomEvent(MAP_RESULTS_UPDATE_EVENT, { 
     detail: { properties } 
-  });
+  } as CustomEventInit);
   window.dispatchEvent(event);
 }
 
@@ -120,7 +119,7 @@ export function emitMapContextUpdate(context: {
   console.log("Emitting map context update:", context);
   const event = new CustomEvent('map-context-update', { 
     detail: context 
-  });
+  } as CustomEventInit);
   window.dispatchEvent(event);
 }
 
@@ -264,7 +263,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log("Setting up map event listeners");
     
-    // Handler for basic location queries
     const handleLocationQuery = (e: CustomEvent<LocationQuery>) => {
       console.log("Map received location query event:", e.detail);
       const query = e.detail;
@@ -273,11 +271,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       clearAllMarkers();
       clearFilteredLocations();
       
-      // Determine which location types to show
       let sourceLocs: LocationWithCoordinates[] = [];
       let targetLocs: LocationWithCoordinates[] = [];
       
-      // Load source locations (properties by default)
       if (query.source === 'property') {
         sourceLocs = [...INDUSTRIAL_PROPERTIES];
       } else if (query.source === 'fedex') {
@@ -287,7 +283,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         setStarbucksLoaded(true);
       }
       
-      // If there's a target, load target locations
       if (query.target) {
         if (query.target === 'property') {
           targetLocs = [...INDUSTRIAL_PROPERTIES];
@@ -298,7 +293,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           setStarbucksLoaded(true);
         }
         
-        // Find locations within radius of target
         const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
           sourceLocs,
           targetLocs,
@@ -307,7 +301,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         console.log(`Found ${sourceLocations.length} ${query.source} locations within ${query.radius} miles of ${query.target}`);
         
-        // Add the filtered locations to the map
         if (query.source === 'property') {
           addFilteredLocations(sourceLocations, 'property', '#3B82F6', '#1E40AF');
         } else if (query.source === 'fedex') {
@@ -316,7 +309,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           addFilteredLocations(sourceLocations, 'starbucks', '#00704A', '#ffffff');
         }
         
-        // Add the target locations
         if (query.target === 'property') {
           addFilteredLocations(targetLocations, 'property', '#3B82F6', '#1E40AF');
         } else if (query.target === 'fedex') {
@@ -325,19 +317,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           addFilteredLocations(targetLocations, 'starbucks', '#00704A', '#ffffff');
         }
         
-        // Add connection lines
         addConnectionLines(connections);
         
-        // Fit the map to show all locations
         const allCoordinates = [...sourceLocations, ...targetLocations].map(loc => loc.coordinates as [number, number]);
         fitMapToLocations(allCoordinates);
         
-        // Emit results update for the property table
         if (query.source === 'property') {
           emitResultsUpdate(sourceLocations);
         }
       } else {
-        // If there's no target, just show all source locations
         if (query.source === 'property') {
           addFilteredLocations(sourceLocs, 'property', '#3B82F6', '#1E40AF');
           fitMapToLocations(sourceLocs.map(loc => loc.coordinates as [number, number]));
@@ -352,7 +340,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     };
     
-    // Handler for complex spatial queries
     const handleComplexQuery = (e: CustomEvent<LocationQuery>) => {
       console.log("Map received complex query event:", e.detail);
       const query = e.detail;
@@ -371,7 +358,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       let includeLocations: LocationWithCoordinates[] = [];
       let excludeLocations: LocationWithCoordinates[] = [];
       
-      // Load include locations
       if (includeType === 'fedex') {
         includeLocations = loadFedExLocations();
       } else if (includeType === 'starbucks') {
@@ -381,7 +367,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         includeLocations = [...INDUSTRIAL_PROPERTIES];
       }
       
-      // Load exclude locations
       if (excludeType === 'fedex') {
         excludeLocations = loadFedExLocations();
       } else if (excludeType === 'starbucks') {
@@ -391,7 +376,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         excludeLocations = [...INDUSTRIAL_PROPERTIES];
       }
       
-      // Use complex spatial query to find properties
       const result = findLocationsWithComplexSpatialQuery(
         INDUSTRIAL_PROPERTIES,
         includeLocations,
@@ -400,41 +384,29 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         excludeRadius
       );
       
-      // Add the properties to the map
       addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF');
       
-      // Add the include locations that are connected to the results
       const connectedIncludeLocations = new Set<string>();
       result.includeConnections.forEach(conn => {
         const targetCoord = conn.target.toString();
         connectedIncludeLocations.add(targetCoord);
       });
       
-      // Add the connections
       addConnectionLines(result.includeConnections);
       
-      // Filter include locations to only show those connected to results
       const visibleIncludeLocations = includeLocations.filter(loc => {
         const coord = getCoordinates(loc).toString();
         return connectedIncludeLocations.has(coord);
       });
       
-      // Add include location markers
-      if (includeType === 'fedex') {
-        addFilteredLocations(visibleIncludeLocations, 'fedex', '#FFFFFF', '#FF6600');
-      } else if (includeType === 'starbucks') {
-        addFilteredLocations(visibleIncludeLocations, 'starbucks', '#00704A', '#ffffff');
-      }
+      addFilteredLocations(visibleIncludeLocations, 'fedex', '#FFFFFF', '#FF6600');
       
-      // Fit the map to show all locations
       const allCoordinates = [...result.resultLocations, ...visibleIncludeLocations].map(loc => loc.coordinates as [number, number]);
       fitMapToLocations(allCoordinates);
       
-      // Update property results
       emitResultsUpdate(result.resultLocations);
     };
     
-    // Handler for multi-target queries
     const handleMultiTargetQuery = (e: CustomEvent<LocationQuery>) => {
       console.log("Map received multi-target query event:", e.detail);
       const query = e.detail;
@@ -469,24 +441,19 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         };
       });
       
-      // Find properties that meet all criteria
       const result = findPropertiesWithMultiTargetProximity(
         INDUSTRIAL_PROPERTIES,
         targetDataArray
       );
       
-      // Add properties to the map
       addFilteredLocations(result.resultProperties, 'property', '#3B82F6', '#1E40AF');
       
-      // Track which target locations are connected to results
       const connectedTargets = new Map<LocationSourceTarget, Set<string>>();
       
-      // Initialize sets for each target type
       targetTypes.forEach(targetData => {
         connectedTargets.set(targetData.type, new Set<string>());
       });
       
-      // Add connections to the map and track connected targets
       result.connections.forEach(conn => {
         const targetCoord = conn.target.toString();
         const targetType = conn.targetType;
@@ -497,21 +464,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Add connection lines
       addConnectionLines(result.connections);
       
-      // Add only the connected target locations
       targetDataArray.forEach(targetData => {
         const targetSet = connectedTargets.get(targetData.type);
         
         if (targetSet) {
-          // Filter target locations to only include those connected to results
           const connectedLocations = targetData.locations.filter(loc => {
             const coord = getCoordinates(loc).toString();
             return targetSet.has(coord);
           });
           
-          // Add target markers
           if (targetData.type === 'fedex') {
             addFilteredLocations(connectedLocations, 'fedex', '#FFFFFF', '#FF6600');
           } else if (targetData.type === 'starbucks') {
@@ -522,20 +485,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Get all displayed locations for map fitting
       const allCoordinates = [
         ...result.resultProperties.map(loc => loc.coordinates as [number, number]),
         ...result.connections.map(conn => conn.target)
       ];
       
-      // Fit the map to show all locations
       fitMapToLocations(allCoordinates);
       
-      // Update property results
       emitResultsUpdate(result.resultProperties);
     };
     
-    // Handler for dynamic queries
     const handleDynamicQuery = (e: CustomEvent<LocationQuery>) => {
       console.log("Map received dynamic query event:", e.detail);
       const query = e.detail;
@@ -551,7 +510,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const { primaryType, targetTypes } = query.dynamicQuery;
       
-      // Prepare target config object
       const targetTypeConfig: {
         [key in LocationSourceTarget]?: {
           locations: LocationWithCoordinates[];
@@ -559,7 +517,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         };
       } = {};
       
-      // Load all the necessary location data
       Object.entries(targetTypes).forEach(([typeStr, config]) => {
         const type = typeStr as LocationSourceTarget;
         
@@ -582,7 +539,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Determine primary locations based on primaryType
       let primaryLocations: LocationWithCoordinates[] = [];
       
       if (primaryType === 'property') {
@@ -594,14 +550,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         setStarbucksLoaded(true);
       }
       
-      // Find locations that meet all criteria
       const result = findLocationsWithTripleTypeProximity(
         primaryLocations,
-        primaryLocations, // Source locations (same as primary)
+        primaryLocations,
         targetTypeConfig
       );
       
-      // Add primary locations to the map
       if (primaryType === 'property') {
         addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF');
       } else if (primaryType === 'fedex') {
@@ -610,15 +564,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         addFilteredLocations(result.resultLocations, 'starbucks', '#00704A', '#ffffff');
       }
       
-      // Track which target locations are connected to results
       const connectedTargets = new Map<LocationSourceTarget, Set<string>>();
       
-      // Initialize sets for each target type
       Object.keys(targetTypes).forEach(typeStr => {
         connectedTargets.set(typeStr as LocationSourceTarget, new Set<string>());
       });
       
-      // Add connections to the map and track connected targets
       result.connections.forEach(conn => {
         const targetCoord = conn.target.toString();
         const targetType = conn.targetType;
@@ -629,22 +580,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Add connection lines
       addConnectionLines(result.connections);
       
-      // Add only the connected target locations
       Object.entries(targetTypeConfig).forEach(([typeStr, config]) => {
         const targetType = typeStr as LocationSourceTarget;
         const targetSet = connectedTargets.get(targetType);
         
         if (targetSet && targetType !== primaryType) {
-          // Filter target locations to only include those connected to results
           const connectedLocations = config.locations.filter(loc => {
             const coord = getCoordinates(loc).toString();
             return targetSet.has(coord);
           });
           
-          // Add target markers
           if (targetType === 'fedex') {
             addFilteredLocations(connectedLocations, 'fedex', '#FFFFFF', '#FF6600');
           } else if (targetType === 'starbucks') {
@@ -655,28 +602,23 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Get all displayed locations for map fitting
       const allCoordinates = [
         ...result.resultLocations.map(loc => loc.coordinates as [number, number]),
         ...result.connections.map(conn => conn.target)
       ];
       
-      // Fit the map to show all locations
       fitMapToLocations(allCoordinates);
       
-      // Update property results if the primary type is property
       if (primaryType === 'property') {
         emitResultsUpdate(result.resultLocations);
       }
     };
     
-    // Add event listeners
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
     window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
     window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
     window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
     
-    // Cleanup on unmount
     return () => {
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
       window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
