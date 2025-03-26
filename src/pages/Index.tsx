@@ -16,26 +16,26 @@ const Index = () => {
     setupDebugEventListener(MULTI_TARGET_QUERY_EVENT);
     setupDebugEventListener(DYNAMIC_QUERY_EVENT);
     
-    const handleLocationQuery = (e: CustomEvent) => {
-      console.log("Index page received location query event:", e.detail);
+    const handleLocationQuery = (e: Event) => {
+      console.log("Index page received location query event:", (e as CustomEvent).detail);
     };
     
-    const handleComplexQuery = (e: CustomEvent) => {
-      console.log("Index page received complex query event:", e.detail);
+    const handleComplexQuery = (e: Event) => {
+      console.log("Index page received complex query event:", (e as CustomEvent).detail);
     };
     
-    const handleMultiTargetQuery = (e: CustomEvent) => {
-      console.log("Index page received multi-target query event:", e.detail);
+    const handleMultiTargetQuery = (e: Event) => {
+      console.log("Index page received multi-target query event:", (e as CustomEvent).detail);
     };
     
-    const handleDynamicQuery = (e: CustomEvent) => {
-      console.log("Index page received dynamic query event:", e.detail);
+    const handleDynamicQuery = (e: Event) => {
+      console.log("Index page received dynamic query event:", (e as CustomEvent).detail);
     };
     
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
-    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     
     // Enhanced global error handling for event-related issues
     window.addEventListener('error', (e) => {
@@ -43,10 +43,10 @@ const Index = () => {
     });
     
     return () => {
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
-      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     };
   }, []);
 

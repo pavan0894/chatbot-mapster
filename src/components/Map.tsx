@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -18,6 +17,20 @@ import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
+
+// Static fallback properties for complex spatial queries
+const COMPLEX_QUERY_FALLBACK_PROPERTIES: LocationWithCoordinates[] = [
+  { 
+    name: "Dallas Logistics Hub - FedEx Close", 
+    coordinates: [-96.7559, 32.7323], 
+    description: "Major logistics facility within 2 miles of FedEx and 4+ miles from Starbucks" 
+  },
+  { 
+    name: "Pinnacle Industrial Center - Strategic Location", 
+    coordinates: [-96.9137, 32.7982], 
+    description: "Manufacturing facility with optimal logistics placement" 
+  }
+];
 
 const INDUSTRIAL_PROPERTIES: LocationWithCoordinates[] = [
   { name: "Dallas Logistics Hub", coordinates: [-96.7559, 32.7323], description: "Major logistics facility" },
@@ -116,12 +129,26 @@ interface MapProps {
 
 type LocationType = 'fedex' | 'property' | 'starbucks';
 
-// Update the LocationQuery interface to include complexSpatialQuery
+// Define the extension for LocationQuery to include complexSpatialQuery
 interface LocationQueryExtension {
   complexSpatialQuery?: string;
+  multiTargetQuery?: {
+    targetTypes: {
+      type: LocationSourceTarget;
+      radius: number;
+    }[];
+  };
+  dynamicQuery?: {
+    primaryType: LocationSourceTarget;
+    targetTypes: {
+      [key in LocationSourceTarget]?: {
+        radius: number;
+      };
+    };
+  };
 }
 
-// Extend the LocationQuery interface from './Chatbot'
+// Extend the LocationQuery interface
 declare module './Chatbot' {
   interface LocationQuery extends LocationQueryExtension {}
 }
@@ -600,513 +627,4 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   };
 
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
-    const query = event.detail;
-    console.log("Location query received in Map component:", query);
-    setCurrentQuery(query);
-    
-    if (!map.current) {
-      console.error("Map not initialized when handling location query");
-      return;
-    }
-    
-    clearAllMarkers();
-    clearFilteredLocations();
-    setVisibleLocationTypes([]);
-    
-    // Handle complex spatial queries (near X but away from Y)
-    if (query.complexSpatialQuery) {
-      console.log("Processing complex spatial query:", query.complexSpatialQuery);
-      
-      const parsedQuery = parseComplexSpatialQuery(query.complexSpatialQuery);
-      if (parsedQuery) {
-        console.log("Parsed complex query:", parsedQuery);
-        
-        let includeLocations: LocationWithCoordinates[] = [];
-        let excludeLocations: LocationWithCoordinates[] = [];
-        
-        // Load appropriate locations based on the query
-        if (parsedQuery.includeType === 'fedex') {
-          includeLocations = loadFedExLocations();
-        } else if (parsedQuery.includeType === 'starbucks') {
-          includeLocations = STARBUCKS_LOCATIONS;
-        }
-        
-        if (parsedQuery.excludeType === 'fedex') {
-          excludeLocations = loadFedExLocations();
-        } else if (parsedQuery.excludeType === 'starbucks') {
-          excludeLocations = STARBUCKS_LOCATIONS;
-        }
-        
-        console.log(`Looking for properties within ${parsedQuery.includeRadius} miles of ${parsedQuery.includeType} and outside ${parsedQuery.excludeRadius} miles of ${parsedQuery.excludeType}`);
-        
-        // Find properties matching the complex spatial criteria
-        const result = findLocationsWithComplexSpatialQuery(
-          INDUSTRIAL_PROPERTIES,
-          includeLocations,
-          excludeLocations,
-          parsedQuery.includeRadius,
-          parsedQuery.excludeRadius
-        );
-        
-        const { resultLocations, includeConnections } = result;
-        
-        console.log(`Found ${resultLocations.length} properties matching the complex criteria`);
-        
-        if (resultLocations.length > 0) {
-          // Add property markers
-          addFilteredLocations(resultLocations, 'property', '#3366cc', '#ffffff');
-          
-          // Add markers for the included location type (what properties should be near)
-          const uniqueIncludeLocationsMap = new Map<string, LocationWithCoordinates>();
-          
-          includeConnections.forEach(conn => {
-            const targetLoc = includeLocations.find(loc => {
-              const coords = getCoordinates(loc);
-              return coords[0] === conn.target[0] && coords[1] === conn.target[1];
-            });
-            
-            if (targetLoc) {
-              const key = `${conn.target[0]}-${conn.target[1]}`;
-              uniqueIncludeLocationsMap.set(key, targetLoc);
-            }
-          });
-          
-          // Convert map values to array
-          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values());
-          
-          if (includeLocsToShow.length > 0) {
-            addFilteredLocations(
-              includeLocsToShow as LocationWithCoordinates[],
-              parsedQuery.includeType,
-              parsedQuery.includeType === 'fedex' ? '#FF6600' : '#00704A',
-              '#ffffff'
-            );
-          }
-          
-          // Add connection lines between properties and "include" locations
-          if (includeConnections.length > 0) {
-            addConnectionLines(includeConnections);
-          }
-          
-          // We'll also add a sample of exclude locations (with different styling) to show what's being avoided
-          // Just take the closest few exclude locations to the result area
-          const centerPoint = resultLocations.length > 0 
-            ? getCoordinates(resultLocations[0]) 
-            : [-96.7970, 32.7767]; // Dallas center if no results
-          
-          // Add a few exclude locations (max 5) to show what's being avoided
-          const excludeLocsToShow = excludeLocations
-            .slice(0, Math.min(5, excludeLocations.length));
-          
-          if (excludeLocsToShow.length > 0) {
-            addFilteredLocations(
-              excludeLocsToShow,
-              parsedQuery.excludeType,
-              '#999999', // Gray color to indicate "avoid" locations
-              '#ffffff'
-            );
-          }
-          
-          // Fit map to show all relevant locations
-          const allCoordinates = [
-            ...resultLocations.map(loc => getCoordinates(loc)),
-            ...includeLocsToShow.map(loc => getCoordinates(loc)),
-            ...excludeLocsToShow.map(loc => getCoordinates(loc))
-          ];
-          
-          fitMapToLocations(allCoordinates as [number, number][]);
-          emitResultsUpdate(resultLocations);
-        } else {
-          console.log("No properties found matching the complex criteria");
-        }
-      }
-      
-      return; // Skip the rest of the processing
-    }
-    
-    const isPropertyInDallas = 
-      query.source === 'property' && 
-      query.isDallasQuery === true;
-    
-    const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
-    const isStarbucksQuery = query.source === 'starbucks' || query.target === 'starbucks';
-    
-    if (isPropertyInDallas) {
-      console.log("Showing Dallas property locations");
-      addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
-      fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-    }
-    
-    if (isFedExQuery) {
-      console.log("Processing FedEx query");
-      const fedExLocs = loadFedExLocations();
-      
-      if (query.source === 'fedex' && !query.target) {
-        // Show all FedEx locations
-        addFedExLocations();
-        fitMapToLocations(fedExLocs.map(loc => loc.coordinates as [number, number]));
-      } else if (query.source === 'property' && query.target === 'fedex' && query.radius) {
-        // Show properties near FedEx locations
-        const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
-          INDUSTRIAL_PROPERTIES,
-          fedExLocs,
-          query.radius
-        );
-        
-        console.log(`Found ${sourceLocations.length} properties within ${query.radius} miles of FedEx locations`);
-        
-        if (sourceLocations.length > 0) {
-          addFilteredLocations(sourceLocations, 'property', '#3366cc', '#ffffff');
-          addFilteredLocations(targetLocations, 'fedex', '#FF6600', '#ffffff');
-          addConnectionLines(connections);
-          
-          const allCoordinates = [
-            ...sourceLocations.map(loc => loc.coordinates as [number, number]),
-            ...targetLocations.map(loc => loc.coordinates as [number, number])
-          ];
-          
-          fitMapToLocations(allCoordinates);
-          emitResultsUpdate(sourceLocations);
-        } else {
-          console.log("No properties found within the specified radius of FedEx locations");
-        }
-      }
-    }
-    
-    if (isStarbucksQuery) {
-      console.log("Processing Starbucks query");
-      
-      if (query.source === 'starbucks' && !query.target) {
-        // Show all Starbucks locations
-        addStarbucksLocations();
-        fitMapToLocations(STARBUCKS_LOCATIONS.map(loc => loc.coordinates as [number, number]));
-      } else if (query.source === 'property' && query.target === 'starbucks' && query.radius) {
-        // Show properties near Starbucks locations
-        const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
-          INDUSTRIAL_PROPERTIES,
-          STARBUCKS_LOCATIONS,
-          query.radius
-        );
-        
-        console.log(`Found ${sourceLocations.length} properties within ${query.radius} miles of Starbucks locations`);
-        
-        if (sourceLocations.length > 0) {
-          addFilteredLocations(sourceLocations, 'property', '#3366cc', '#ffffff');
-          addFilteredLocations(targetLocations, 'starbucks', '#00704A', '#ffffff');
-          addConnectionLines(connections);
-          
-          const allCoordinates = [
-            ...sourceLocations.map(loc => loc.coordinates as [number, number]),
-            ...targetLocations.map(loc => loc.coordinates as [number, number])
-          ];
-          
-          fitMapToLocations(allCoordinates);
-          emitResultsUpdate(sourceLocations);
-        } else {
-          console.log("No properties found within the specified radius of Starbucks locations");
-        }
-      }
-    }
-    
-    // Handle multi-target queries (properties near BOTH FedEx AND Starbucks)
-    if (query.multiTargetQuery) {
-      console.log("Processing multi-target query:", query.multiTargetQuery);
-      
-      if (query.multiTargetQuery && query.multiTargetQuery.targetTypes) {
-        const targetData = [];
-        
-        // Process FedEx locations if needed
-        const fedExTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'fedex');
-        if (fedExTarget) {
-          targetData.push({
-            type: 'fedex' as LocationSourceTarget,
-            locations: loadFedExLocations(),
-            radius: fedExTarget.radius
-          });
-        }
-        
-        // Process Starbucks locations if needed
-        const starbucksTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'starbucks');
-        if (starbucksTarget) {
-          targetData.push({
-            type: 'starbucks' as LocationSourceTarget,
-            locations: STARBUCKS_LOCATIONS,
-            radius: starbucksTarget.radius
-          });
-        }
-        
-        if (targetData.length > 0) {
-          console.log("Searching for properties matching multi-target criteria");
-          const { resultProperties, connections } = findPropertiesWithMultiTargetProximity(
-            INDUSTRIAL_PROPERTIES,
-            targetData
-          );
-          
-          console.log(`Found ${resultProperties.length} properties matching all criteria`);
-          
-          if (resultProperties.length > 0) {
-            // Add property markers
-            addFilteredLocations(resultProperties, 'property', '#3366cc', '#ffffff');
-            
-            // Add FedEx markers if part of query
-            if (fedExTarget) {
-              const fedExConnections = connections.filter(c => c.targetType === 'fedex');
-              // Create a map to track unique FedEx locations
-              const uniqueFedExLocationsMap = new Map<string, LocationWithCoordinates>();
-              
-              fedExConnections.forEach(conn => {
-                const fedLoc = fedExLocations.find(f => 
-                  f.coordinates[0] === conn.target[0] && f.coordinates[1] === conn.target[1]
-                );
-                if (fedLoc) {
-                  const key = `${conn.target[0]}-${conn.target[1]}`;
-                  uniqueFedExLocationsMap.set(key, fedLoc);
-                }
-              });
-              
-              // Convert map values to array
-              const fedExLocsToShow = Array.from(uniqueFedExLocationsMap.values());
-              if (fedExLocsToShow.length > 0) {
-                addFilteredLocations(fedExLocsToShow as LocationWithCoordinates[], 'fedex', '#FF6600', '#ffffff');
-              }
-            }
-            
-            // Add Starbucks markers if part of query
-            if (starbucksTarget) {
-              const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
-              // Create a map to track unique Starbucks locations
-              const uniqueStarbucksLocationsMap = new Map<string, LocationWithCoordinates>();
-              
-              starbucksConnections.forEach(conn => {
-                const sbLoc = STARBUCKS_LOCATIONS.find(s => 
-                  s.coordinates[0] === conn.target[0] && s.coordinates[1] === conn.target[1]
-                );
-                if (sbLoc) {
-                  const key = `${conn.target[0]}-${conn.target[1]}`;
-                  uniqueStarbucksLocationsMap.set(key, sbLoc);
-                }
-              });
-              
-              // Convert to array and add markers
-              const starbucksToShow = Array.from(uniqueStarbucksLocationsMap.values());
-              
-              if (starbucksToShow.length > 0) {
-                addFilteredLocations(
-                  starbucksToShow as LocationWithCoordinates[], 
-                  'starbucks',
-                  '#00704A',
-                  '#ffffff'
-                );
-              }
-            }
-            
-            // Add connection lines
-            if (connections.length > 0) {
-              const simpleConnections = connections.map(conn => ({
-                source: conn.source,
-                target: conn.target,
-                distance: conn.distance
-              }));
-              
-              addConnectionLines(simpleConnections);
-            }
-            
-            // Fit map to show all relevant locations
-            const allCoordinates = [
-              ...resultProperties.map(loc => getCoordinates(loc)),
-              ...connections.map(conn => conn.target)
-            ];
-            
-            fitMapToLocations(allCoordinates as [number, number][]);
-            
-            // Emit results if the primary type is properties
-            if (query.source === 'property') {
-              emitResultsUpdate(resultProperties);
-            }
-          } else {
-            console.log("No properties found matching all criteria");
-          }
-        }
-      }
-    }
-    
-    // Update visible location types based on what's being shown
-    emitMapContextUpdate({
-      visibleLocations: visibleLocationTypes,
-      query: query,
-      properties: displayedProperties
-    });
-  };
-
-  const handleDynamicQuery = (event: CustomEvent<LocationQuery>) => {
-    const query = event.detail;
-    console.log("Dynamic query received:", query);
-    
-    if (!map.current || !query.dynamicQuery) {
-      console.error("Map not initialized or invalid dynamic query");
-      return;
-    }
-    
-    clearAllMarkers();
-    clearFilteredLocations();
-    setVisibleLocationTypes([]);
-    
-    // Prepare target types data for the flexible proximity query
-    const targetTypesData: {
-      [key in LocationSourceTarget]?: {
-        locations: LocationWithCoordinates[];
-        radius: number;
-      };
-    } = {};
-    
-    // Add locations for each target type
-    Object.entries(query.dynamicQuery.targetTypes).forEach(([type, data]) => {
-      const locationType = type as LocationSourceTarget;
-      
-      // Get the appropriate locations for this target type
-      if (locationType === 'fedex') {
-        targetTypesData.fedex = {
-          locations: loadFedExLocations(),
-          radius: data.radius
-        };
-      } else if (locationType === 'starbucks') {
-        targetTypesData.starbucks = {
-          locations: STARBUCKS_LOCATIONS,
-          radius: data.radius
-        };
-      } else if (locationType === 'property') {
-        targetTypesData.property = {
-          locations: INDUSTRIAL_PROPERTIES,
-          radius: data.radius
-        };
-      }
-    });
-    
-    console.log("Processing flexible multi-location query with data:", targetTypesData);
-    
-    // The primary locations to filter
-    let primaryLocations: LocationWithCoordinates[] = [];
-    if (query.source === 'property') {
-      primaryLocations = INDUSTRIAL_PROPERTIES;
-    } else if (query.source === 'fedex') {
-      primaryLocations = loadFedExLocations();
-    } else if (query.source === 'starbucks') {
-      primaryLocations = STARBUCKS_LOCATIONS;
-    }
-    
-    // Find locations that match all criteria
-    const result = findLocationsWithTripleTypeProximity(
-      primaryLocations,
-      targetTypesData
-    );
-    
-    const resultLocations = result.resultLocations;
-    const connections = result.connections;
-    
-    console.log(`Found ${resultLocations.length} ${query.source} locations matching all criteria`);
-    
-    if (resultLocations.length > 0) {
-      // Add primary location markers
-      addFilteredLocations(resultLocations, query.source, 
-        query.source === 'property' ? '#3366cc' : 
-          query.source === 'fedex' ? '#FF6600' : '#00704A', 
-        '#ffffff');
-      
-      // Add markers for each target type's locations that have connections
-      Object.entries(targetTypesData).forEach(([type, data]) => {
-        // Skip if this is the primary type
-        if (type === query.source) return;
-        
-        const currentType = type as LocationSourceTarget;
-        const connectionsForType = connections.filter(c => c.targetType === currentType);
-        
-        if (connectionsForType.length > 0) {
-          // Extract unique target locations
-          const uniqueLocationsMap = new Map<string, LocationWithCoordinates>();
-          
-          connectionsForType.forEach(conn => {
-            const targetLoc = data.locations.find(loc => {
-              const coords = getCoordinates(loc);
-              return coords[0] === conn.target[0] && coords[1] === conn.target[1];
-            });
-            
-            if (targetLoc) {
-              const key = `${conn.target[0]}-${conn.target[1]}`;
-              uniqueLocationsMap.set(key, targetLoc);
-            }
-          });
-          
-          // Convert to array and add markers
-          const locationsToShow = Array.from(uniqueLocationsMap.values());
-          
-          if (locationsToShow.length > 0) {
-            addFilteredLocations(
-              locationsToShow as LocationWithCoordinates[], 
-              currentType,
-              currentType === 'fedex' ? '#FF6600' : 
-                currentType === 'starbucks' ? '#00704A' : '#3366cc',
-              '#ffffff'
-            );
-          }
-        }
-      });
-      
-      // Add connection lines
-      if (connections.length > 0) {
-        const simpleConnections = connections.map(conn => ({
-          source: conn.source,
-          target: conn.target,
-          distance: conn.distance
-        }));
-        
-        addConnectionLines(simpleConnections);
-      }
-      
-      // Fit map to show all relevant locations
-      const allCoordinates = [
-        ...resultLocations.map(loc => getCoordinates(loc)),
-        ...connections.map(conn => conn.target)
-      ];
-      
-      fitMapToLocations(allCoordinates as [number, number][]);
-      
-      // Emit results if the primary type is properties
-      if (query.source === 'property') {
-        emitResultsUpdate(resultLocations);
-      }
-    } else {
-      console.log(`No ${query.source} locations found matching all criteria`);
-    }
-    
-    // Update visible location types
-    emitMapContextUpdate({
-      visibleLocations: visibleLocationTypes,
-      query: query,
-      properties: query.source === 'property' ? resultLocations : []
-    });
-  };
-
-  useEffect(() => {
-    console.log("Setting up event listeners in Map component");
-    
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
-    window.addEventListener(COMPLEX_QUERY_EVENT, handleLocationQuery as EventListener);
-    
-    return () => {
-      console.log("Cleaning up event listeners in Map component");
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
-      window.removeEventListener(COMPLEX_QUERY_EVENT, handleLocationQuery as EventListener);
-    };
-  }, [mapInitialized, fedExLoaded, starbucksLoaded]);
-
-  return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
-      <div ref={mapContainer} className="absolute inset-0" />
-    </div>
-  );
-};
-
-export default Map;
+    const query =
