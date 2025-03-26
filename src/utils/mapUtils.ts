@@ -1,4 +1,3 @@
-
 // Convert degrees to radians
 function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
@@ -437,7 +436,7 @@ export function findPropertiesWithMultiTargetProximity(
 
 /**
  * Parse a multi-target proximity query
- * Example: "find properties within 2 miles of fedex and 3 miles of starbucks"
+ * Example: "find properties within 2 miles of FedEx and 3 miles of Starbucks"
  */
 export function parseMultiTargetQuery(query: string): {
   targetTypes: {
@@ -605,7 +604,8 @@ function normalizeLocationType(type: string): LocationSourceTarget | null {
 // New function for dynamic triple-type location query
 export function findLocationsWithTripleTypeProximity(
   primaryLocations: LocationWithCoordinates[],
-  targetTypesData: {
+  sourceLocations: LocationWithCoordinates[],
+  targetTypeConfig: {
     [key in LocationSourceTarget]?: {
       locations: LocationWithCoordinates[];
       radius: number;
@@ -631,7 +631,7 @@ export function findLocationsWithTripleTypeProximity(
   console.log(`Starting with ${resultLocations.length} total locations`);
 
   // Process each target type to filter the results
-  Object.entries(targetTypesData).forEach(([targetTypeStr, data]) => {
+  Object.entries(targetTypeConfig).forEach(([targetTypeStr, data]) => {
     const targetType = targetTypeStr as LocationSourceTarget;
     const { locations, radius } = data;
 
