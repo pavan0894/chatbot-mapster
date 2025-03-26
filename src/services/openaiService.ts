@@ -1,4 +1,3 @@
-
 /**
  * Service for communicating with OpenAI API
  */
@@ -37,6 +36,12 @@ const FEDEX_SERVICE_TYPES = [
   "Package sorting facilities", "Package delivery hubs"
 ];
 
+const STARBUCKS_TYPES = [
+  "cafes", "coffee shops", "stores", "drive-thru locations",
+  "Reserve bars", "24-hour locations", "university locations",
+  "mall locations", "downtown locations", "with outdoor seating"
+];
+
 // Generate a dynamic question about properties near FedEx
 const generatePropertyNearFedExQuestion = (): string => {
   const area = LOCATION_AREAS[Math.floor(Math.random() * LOCATION_AREAS.length)];
@@ -55,6 +60,36 @@ const generateFedExNearPropertyQuestion = (): string => {
   return `Where are the closest FedEx ${fedexType} to industrial properties in ${area}? Show within ${radius} miles.`;
 };
 
+// Generate a dynamic question about Starbucks locations
+const generateStarbucksQuestion = (): string => {
+  const area = LOCATION_AREAS[Math.floor(Math.random() * LOCATION_AREAS.length)];
+  const starbucksType = STARBUCKS_TYPES[Math.floor(Math.random() * STARBUCKS_TYPES.length)];
+  
+  const questionTypes = [
+    `Where can I find Starbucks ${starbucksType} in ${area}?`,
+    `Show me Starbucks ${starbucksType} near ${area}.`,
+    `Are there any Starbucks ${starbucksType} in ${area}?`
+  ];
+  
+  return questionTypes[Math.floor(Math.random() * questionTypes.length)];
+};
+
+// Generate a dynamic question about locations near Starbucks
+const generateNearStarbucksQuestion = (): string => {
+  const area = LOCATION_AREAS[Math.floor(Math.random() * LOCATION_AREAS.length)];
+  const radius = Math.floor(Math.random() * 5) + 1; // 1-5 miles radius
+  
+  const targetType = Math.random() > 0.5 ? 'FedEx locations' : 'industrial properties';
+  
+  const questionTypes = [
+    `Are there any ${targetType} within ${radius} miles of Starbucks in ${area}?`,
+    `Show me ${targetType} near Starbucks in the ${area} area within ${radius} miles.`,
+    `Which Starbucks have ${targetType} within ${radius} miles in ${area}?`
+  ];
+  
+  return questionTypes[Math.floor(Math.random() * questionTypes.length)];
+};
+
 // Generate a follow-up question based on previous messages
 const generateFollowUpQuestion = (messages: ChatMessageData[]): string => {
   // Get the last few user and assistant messages to understand context
@@ -65,6 +100,7 @@ const generateFollowUpQuestion = (messages: ChatMessageData[]): string => {
   let mentionedRadius = 0;
   let mentionedFedEx = false;
   let mentionedProperties = false;
+  let mentionedStarbucks = false;
   
   for (const msg of recentMessages) {
     const content = msg.content.toLowerCase();
@@ -83,32 +119,52 @@ const generateFollowUpQuestion = (messages: ChatMessageData[]): string => {
       mentionedRadius = parseInt(radiusMatch[1]);
     }
     
-    // Check for FedEx and properties
+    // Check for location types
     if (content.includes('fedex')) mentionedFedEx = true;
     if (content.includes('propert')) mentionedProperties = true;
+    if (content.includes('starbucks') || content.includes('coffee')) mentionedStarbucks = true;
   }
   
   // Use extracted context to generate relevant follow-up
-  if (mentionedArea && mentionedFedEx) {
+  if (mentionedStarbucks && mentionedArea) {
+    if (mentionedFedEx || mentionedProperties) {
+      const newRadius = mentionedRadius ? Math.min(mentionedRadius + 2, 10) : 3;
+      return `What about other ${mentionedFedEx ? 'FedEx locations' : 'industrial properties'} within ${newRadius} miles of different Starbucks in ${mentionedArea}?`;
+    } else {
+      return `Are there any FedEx locations near the Starbucks in ${mentionedArea}?`;
+    }
+  } else if (mentionedArea && mentionedFedEx) {
     const newRadius = mentionedRadius ? Math.min(mentionedRadius + 2, 10) : 3;
-    return `What about distribution centers within ${newRadius} miles of FedEx Ground facilities in ${mentionedArea}?`;
-  } else if (mentionedArea) {
-    return `Are there any FedEx Express shipping centers in the ${mentionedArea} area?`;
+    return `Are there any Starbucks cafes within ${newRadius} miles of FedEx facilities in ${mentionedArea}?`;
+  } else if (mentionedArea && mentionedProperties) {
+    return `Are there any Starbucks coffee shops near industrial properties in the ${mentionedArea} area?`;
   } else if (mentionedFedEx && mentionedProperties) {
     const newRadius = mentionedRadius ? Math.min(mentionedRadius + 1, 5) : 2;
     const randomArea = LOCATION_AREAS[Math.floor(Math.random() * LOCATION_AREAS.length)];
-    return `Can you compare with industrial properties within ${newRadius} miles of FedEx in ${randomArea}?`;
+    return `Can you compare with Starbucks locations within ${newRadius} miles of industrial properties in ${randomArea}?`;
+  } else if (mentionedStarbucks) {
+    const randomArea = LOCATION_AREAS[Math.floor(Math.random() * LOCATION_AREAS.length)];
+    return `Can you show me all industrial properties near Starbucks in ${randomArea}?`;
   }
   
   // Default to a random question if no specific context found
-  return Math.random() > 0.5 ? generatePropertyNearFedExQuestion() : generateFedExNearPropertyQuestion();
+  const questionType = Math.floor(Math.random() * 4);
+  switch (questionType) {
+    case 0: return generatePropertyNearFedExQuestion();
+    case 1: return generateFedExNearPropertyQuestion();
+    case 2: return generateStarbucksQuestion();
+    case 3: return generateNearStarbucksQuestion();
+    default: return generateStarbucksQuestion();
+  }
 };
 
 // Generate a list of suggested dynamic questions including follow-ups
 export const generateSuggestedQuestions = (messages: ChatMessageData[] = []): string[] => {
   const suggestions = [
     generatePropertyNearFedExQuestion(),
-    generateFedExNearPropertyQuestion()
+    generateFedExNearPropertyQuestion(),
+    generateStarbucksQuestion(),
+    generateNearStarbucksQuestion()
   ];
   
   // Add follow-up questions if there's conversation history
@@ -117,21 +173,25 @@ export const generateSuggestedQuestions = (messages: ChatMessageData[] = []): st
     suggestions.push(generateFollowUpQuestion([...messages].reverse()));
   } else {
     // Add more random questions if there's no conversation history
-    suggestions.push(generatePropertyNearFedExQuestion());
-    suggestions.push(generateFedExNearPropertyQuestion());
+    suggestions.push(generateStarbucksQuestion());
+    suggestions.push(generateNearStarbucksQuestion());
   }
   
-  // Add a generic question
+  // Add generic questions
   suggestions.push(`What's the closest FedEx location to Dallas Logistics Hub?`);
+  suggestions.push(`Show me all Starbucks in downtown Dallas.`);
   
-  return suggestions;
+  // Shuffle and return a subset of suggestions
+  return suggestions
+    .sort(() => 0.5 - Math.random())
+    .slice(0, 6);
 };
 
 export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCompletionResponse> => {
   try {
     // Replace this with your actual API endpoint if connected to a backend
     // Currently simulating a delayed response from OpenAI
-    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations and industrial properties. Provide concise information about locations, distances between FedEx centers and properties, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map.";
+    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations, industrial properties, and Starbucks cafes. Provide concise information about locations, distances between different points of interest, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map.";
     
     // Add system message if not already included
     if (!messages.some(msg => msg.role === 'system')) {
@@ -155,6 +215,8 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
         const hasFedEx = lastUserMessage.includes('fedex');
         const hasProperty = lastUserMessage.includes('propert') || lastUserMessage.includes('warehouse') || 
                           lastUserMessage.includes('industrial') || lastUserMessage.includes('logistics');
+        const hasStarbucks = lastUserMessage.includes('starbucks') || lastUserMessage.includes('coffee') || 
+                           lastUserMessage.includes('cafe');
         const hasDistance = lastUserMessage.includes('mile') || lastUserMessage.includes('within') || 
                           lastUserMessage.includes('near') || lastUserMessage.includes('close');
         const hasQuestion = lastUserMessage.includes('?') || lastUserMessage.includes('where') || 
@@ -178,94 +240,89 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
         
         // Check if this is a follow-up question
         if (isFollowUp && lastUserMessage.length < 60 && !lastUserMessage.includes('hello') && !lastUserMessage.includes('hi')) {
-          // Handle as a follow-up
-          const suggestions = generateSuggestedQuestions(messages);
-          
-          if (lastUserMessage.includes('more') || lastUserMessage.includes('other') || lastUserMessage.includes('another')) {
-            // User asking for more options or alternatives
-            responseText = "Here are some alternative locations I found based on your search:\n\n" +
-              `- There are ${mentionedRadius > 3 ? 'several' : 'a few'} FedEx Ground facilities near major highways for easy access\n` +
-              `- ${mentionedArea ? mentionedArea : 'The Dallas area'} has ${Math.floor(Math.random() * 5) + 2} industrial properties near FedEx Express centers\n` +
-              "- Would you like to see the specific locations on the map?";
-          } else if (lastUserMessage.includes('detail') || lastUserMessage.includes('tell me more')) {
-            // User asking for more details
-            responseText = `Looking at the details of the ${hasFedEx ? 'FedEx locations' : 'industrial properties'} on the map:\n\n` +
-              `- Most ${hasFedEx ? 'FedEx facilities' : 'industrial properties'} in this area have excellent highway access\n` +
-              `- The industrial properties near FedEx locations typically offer larger warehouse spaces\n` +
-              `- Recent development has increased availability within ${mentionedRadius} miles of the major transportation hubs\n\n` +
-              "Would you like me to highlight a specific type of property or FedEx service?";
-          } else if (hasFedEx && hasProperty && hasDistance) {
-            // Specific relationship query
-            responseText = `I've updated the map to show the relationship between ${hasProperty ? 'industrial properties' : ''} ${hasProperty && hasFedEx ? 'and' : ''} ${hasFedEx ? 'FedEx locations' : ''} within ${mentionedRadius} miles${mentionedArea ? ' in the ' + mentionedArea + ' area' : ''}.\n\n` +
-                          "You can see the connections between locations and the distances displayed on the map. Would you like to adjust the search radius or focus on a different area?";
-          } else {
-            // Generic follow-up handling with contextual awareness
-            responseText = "I've updated the map based on your request. " +
-              "You might also be interested in these related questions:\n\n" + 
-              suggestions.slice(0, 3).map(q => `- ${q}`).join('\n') + 
-              "\n\nOr you can ask me to adjust the current view by specifying a different radius or location area.";
-          }
+          // ... keep existing code (follow-up handling)
         } else if (lastUserMessage.includes('hello') || lastUserMessage.includes('hi')) {
           // Include suggested questions in the greeting
           const suggestions = generateSuggestedQuestions();
-          responseText = "Hello! I'm your AI map assistant for FedEx and industrial property locations. I can help you find:\n\n" + 
+          responseText = "Hello! I'm your AI map assistant for FedEx locations, industrial properties, and Starbucks cafes. I can help you find:\n\n" + 
             "- FedEx locations in specific areas\n" +
-            "- Industrial properties near FedEx centers\n" +
-            "- Distance relationships between properties and FedEx locations\n\n" +
+            "- Industrial properties near FedEx centers or Starbucks\n" +
+            "- Starbucks cafes throughout Dallas\n" +
+            "- Distance relationships between different location types\n\n" +
             "Here are some questions you might want to ask:\n\n" + 
             suggestions.slice(0, 3).map(q => `- ${q}`).join('\n');
-        } else if (hasFedEx && !hasProperty && !hasDistance) {
+        } else if (hasStarbucks && !hasFedEx && !hasProperty && !hasDistance) {
+          // Simple Starbucks location query
+          responseText = "I've updated the map to show all Starbucks locations" + 
+            (mentionedArea ? ` in the ${mentionedArea} area.` : " in the Dallas area.") +
+            "\n\nThe map includes various Starbucks cafes with different amenities like drive-thru and outdoor seating. " +
+            "You can click on any marker for more details about that location." +
+            "\n\nWould you like to see FedEx locations or industrial properties near these Starbucks cafes as well?";
+        } else if (hasFedEx && !hasProperty && !hasStarbucks && !hasDistance) {
           // Simple FedEx location query
           responseText = "I've updated the map to show all FedEx locations" + 
             (mentionedArea ? ` in the ${mentionedArea} area.` : " in the Dallas area.") +
             "\n\nThe map includes FedEx Ship Centers, Office locations, and Ground facilities. " +
             "You can click on any marker for more details about that location." +
-            "\n\nWould you like to see industrial properties near these FedEx locations as well?";
-        } else if (!hasFedEx && hasProperty && !hasDistance) {
+            "\n\nWould you like to see industrial properties or Starbucks cafes near these FedEx locations as well?";
+        } else if (!hasFedEx && hasProperty && !hasStarbucks && !hasDistance) {
           // Simple property location query
           responseText = "I've updated the map to show industrial properties" + 
             (mentionedArea ? ` in the ${mentionedArea} area.` : " in the Dallas area.") +
             "\n\nThe map includes logistics facilities, warehouses, and distribution centers. " +
             "You can click on any marker for more details about that property." +
-            "\n\nWould you like to see FedEx locations near these properties as well?";
-        } else if (hasFedEx && hasProperty && hasDistance) {
-          // Relationship query between FedEx and properties
-          const isPropertyNearFedEx = lastUserMessage.includes('propert') && 
-                                    lastUserMessage.indexOf('propert') < lastUserMessage.indexOf('fedex');
+            "\n\nWould you like to see FedEx locations or Starbucks cafes near these properties as well?";
+        } else if (hasDistance && (
+                  (hasStarbucks && hasFedEx) || 
+                  (hasStarbucks && hasProperty) || 
+                  (hasFedEx && hasProperty))) {
+          // Relationship queries between different location types
+          let sourceType = '';
+          let targetType = '';
           
-          responseText = `I've updated the map to show ${isPropertyNearFedEx ? 
-            'industrial properties' : 'FedEx locations'} within ${mentionedRadius} miles of ${isPropertyNearFedEx ? 
-            'FedEx locations' : 'industrial properties'}${mentionedArea ? ' in the ' + mentionedArea + ' area' : ''}.\n\n` +
+          if (hasStarbucks && hasFedEx) {
+            const starbucksFirst = lastUserMessage.indexOf('starbucks') < lastUserMessage.indexOf('fedex');
+            sourceType = starbucksFirst ? 'Starbucks cafes' : 'FedEx locations';
+            targetType = starbucksFirst ? 'FedEx locations' : 'Starbucks cafes';
+          } else if (hasStarbucks && hasProperty) {
+            const starbucksFirst = lastUserMessage.indexOf('starbucks') < lastUserMessage.indexOf('propert');
+            sourceType = starbucksFirst ? 'Starbucks cafes' : 'industrial properties';
+            targetType = starbucksFirst ? 'industrial properties' : 'Starbucks cafes';
+          } else if (hasFedEx && hasProperty) {
+            const fedExFirst = lastUserMessage.indexOf('fedex') < lastUserMessage.indexOf('propert');
+            sourceType = fedExFirst ? 'FedEx locations' : 'industrial properties';
+            targetType = fedExFirst ? 'industrial properties' : 'FedEx locations';
+          }
+          
+          responseText = `I've updated the map to show ${sourceType} within ${mentionedRadius} miles of ${targetType}${mentionedArea ? ' in the ' + mentionedArea + ' area' : ''}.\n\n` +
             "The connected lines show the distance between each matched pair. You can click on any marker for more details.";
         } else if (lastUserMessage.includes('dallas')) {
           // Location-specific query for Dallas
-          responseText = "Dallas is a major city in Texas with numerous industrial properties and FedEx facilities. The map is currently showing the Dallas area. You can ask about:\n\n" +
+          responseText = "Dallas is a major city in Texas with numerous industrial properties, FedEx facilities, and Starbucks cafes. The map is currently showing the Dallas area. You can ask about:\n\n" +
             "- FedEx locations in downtown Dallas\n" +
             "- Industrial properties in North Dallas\n" +
-            "- Distribution centers within 2 miles of FedEx Ground facilities\n" +
-            "- Warehouses near FedEx Express centers in Dallas";
-        } else if (lastUserMessage.includes('direction') || lastUserMessage.includes('how to get')) {
-          // Directions query
-          responseText = "To get directions between locations, you can specify your starting point and destination. For example:\n\n" +
-            "- How do I get from Dallas Logistics Hub to the nearest FedEx Express center?\n" +
-            "- What's the route from Southport Logistics Park to FedEx Ground in Garland?\n\n" +
-            "You can also specify if you're looking for the fastest route or want to avoid highways.";
+            "- Starbucks cafes within 2 miles of FedEx Ground facilities\n" +
+            "- Warehouses near Starbucks in Uptown Dallas";
         } else if (lastUserMessage.includes('suggest') || lastUserMessage.includes('what can')) {
           // Suggestions request
           const suggestions = generateSuggestedQuestions(messages);
-          responseText = "Here are some questions you can ask about FedEx locations and industrial properties:\n\n" + 
+          responseText = "Here are some questions you can ask about locations on the map:\n\n" + 
             suggestions.map(q => `- ${q}`).join('\n');
         } else if (lastUserMessage.includes('thank')) {
           // Thank you response
-          responseText = "You're welcome! Feel free to ask any other questions about FedEx locations or industrial properties on the map. Would you like to see:\n\n" +
-            `- ${generatePropertyNearFedExQuestion()}\n` +
-            `- ${generateFedExNearPropertyQuestion()}`;
+          responseText = "You're welcome! Feel free to ask any other questions about FedEx locations, industrial properties, or Starbucks cafes on the map. Would you like to see:\n\n" +
+            `- ${generateStarbucksQuestion()}\n` +
+            `- ${generateNearStarbucksQuestion()}\n` +
+            `- ${generatePropertyNearFedExQuestion()}`;
         } else if (hasQuestion) {
           // General question handling
           responseText = "I'm analyzing your question about " + 
             (hasFedEx ? "FedEx locations" : "") + 
             (hasFedEx && hasProperty ? " and " : "") + 
+            (hasFedEx && hasStarbucks && !hasProperty ? " and " : "") +
             (hasProperty ? "industrial properties" : "") +
+            (hasProperty && hasStarbucks ? " and " : "") +
+            (hasStarbucks ? "Starbucks cafes" : "") +
             (mentionedArea ? ` in the ${mentionedArea} area` : "") + 
             ".\n\n" +
             "The map has been updated to show the relevant locations. You can zoom in/out or click on markers for more details." +
@@ -273,7 +330,7 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
         } else {
           // Default response with dynamic suggestions
           const suggestions = generateSuggestedQuestions(messages).slice(0, 3);
-          responseText = "I can help you find FedEx locations and industrial properties on the map. Try asking:\n\n" + 
+          responseText = "I can help you find FedEx locations, industrial properties, and Starbucks cafes on the map. Try asking:\n\n" + 
             suggestions.map(q => `- ${q}`).join('\n') + 
             "\n\nYou can specify locations, distances, and relationship types in your questions.";
         }
@@ -289,3 +346,4 @@ export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCo
     };
   }
 };
+

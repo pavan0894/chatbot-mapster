@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -9,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
 
-export type LocationSourceTarget = 'fedex' | 'property';
+export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
 
 export interface LocationQuery {
   source: LocationSourceTarget;
@@ -71,6 +70,33 @@ function isLocationQuery(message: string): LocationQuery | null {
     /fedex.+\?/i
   ];
   
+  // Starbucks detection patterns
+  const starbucksPatterns = [
+    // Direct mentions
+    /\bstarbucks\b/i,
+    /\bstarbuck's\b/i,
+    /\bcoffee\s+shop[s]?\b/i,
+    /\bcafe[s]?\b/i,
+    
+    // Service-related
+    /coffee/i,
+    /latte/i,
+    /espresso/i,
+    /cappuccino/i,
+    /frappuccino/i,
+    
+    // Query patterns
+    /where\s+(?:are|is)\s+(?:the\s+)?starbucks/i,
+    /show\s+(?:me\s+)?(?:all\s+)?starbucks/i,
+    /find\s+(?:me\s+)?(?:all\s+)?starbucks/i,
+    /locate\s+(?:all\s+)?starbucks/i,
+    /display\s+(?:all\s+)?starbucks/i,
+    /starbucks\s+locations/i,
+    /starbucks\s+(?:near|close|around)/i,
+    /about\s+starbucks/i,
+    /starbucks.+\?/i
+  ];
+  
   const propertyPatterns = [
     // Direct mentions
     /\bproperty\b/i, 
@@ -105,6 +131,9 @@ function isLocationQuery(message: string): LocationQuery | null {
   // Check for FedEx mentions
   const hasFedEx = fedExPatterns.some(pattern => pattern.test(message));
   
+  // Check for Starbucks mentions
+  const hasStarbucks = starbucksPatterns.some(pattern => pattern.test(message));
+  
   // Check for property mentions
   const hasProperty = propertyPatterns.some(pattern => pattern.test(message));
   
@@ -115,7 +144,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     radius = parseInt(radiusMatch[1], 10);
   }
   
-  // Check for questions about "all" FedEx or properties
+  // Check for questions about "all" locations
   const askingForAll = /show\s+(?:me\s+)?all|where\s+(?:are|is)\s+all|find\s+all|display\s+all|list\s+all/i.test(message);
   
   // Check for distance/proximity terms
@@ -131,8 +160,18 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
+  // If explicitly asking for all Starbucks locations
+  if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
+    console.log("Detected request for Starbucks locations");
+    return { 
+      source: 'starbucks' as LocationSourceTarget, 
+      radius,
+      isDallasQuery 
+    };
+  }
+  
   // If explicitly asking for all FedEx locations
-  if (hasFedEx && (askingForAll || !hasProximity) && !hasProperty) {
+  if (hasFedEx && (askingForAll || !hasProximity) && !hasProperty && !hasStarbucks) {
     console.log("Detected request for FedEx locations");
     return { 
       source: 'fedex' as LocationSourceTarget, 
@@ -142,7 +181,7 @@ function isLocationQuery(message: string): LocationQuery | null {
   }
   
   // If explicitly asking for all properties (but not Dallas-specific)
-  if (hasProperty && (askingForAll || !hasProximity) && !hasFedEx) {
+  if (hasProperty && (askingForAll || !hasProximity) && !hasFedEx && !hasStarbucks) {
     console.log("Detected request for property locations");
     return { 
       source: 'property' as LocationSourceTarget, 
@@ -151,16 +190,58 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If both FedEx and properties are mentioned
-  if (hasFedEx && hasProperty) {
-    // If proximity terms found, determine relationship direction
-    if (hasProximity) {
-      // Check which entity is being asked about in relation to the other
+  // Handle proximity queries with multiple location types
+  if (hasProximity) {
+    // Starbucks near properties
+    if (hasStarbucks && hasProperty && !hasFedEx) {
+      const starbucksNearProperty = /starbucks\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message);
+      
+      if (starbucksNearProperty) {
+        console.log("Detected request for Starbucks locations near properties");
+        return {
+          source: 'starbucks' as LocationSourceTarget,
+          target: 'property' as LocationSourceTarget,
+          radius,
+          isDallasQuery
+        };
+      } else {
+        console.log("Detected request for properties near Starbucks locations");
+        return {
+          source: 'property' as LocationSourceTarget,
+          target: 'starbucks' as LocationSourceTarget,
+          radius,
+          isDallasQuery
+        };
+      }
+    }
+    
+    // Starbucks near FedEx
+    if (hasStarbucks && hasFedEx && !hasProperty) {
+      const starbucksNearFedEx = /starbucks\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex/i.test(message);
+      
+      if (starbucksNearFedEx) {
+        console.log("Detected request for Starbucks locations near FedEx");
+        return {
+          source: 'starbucks' as LocationSourceTarget,
+          target: 'fedex' as LocationSourceTarget,
+          radius,
+          isDallasQuery
+        };
+      } else {
+        console.log("Detected request for FedEx locations near Starbucks");
+        return {
+          source: 'fedex' as LocationSourceTarget,
+          target: 'starbucks' as LocationSourceTarget,
+          radius,
+          isDallasQuery
+        };
+      }
+    }
+    
+    // FedEx near properties
+    if (hasFedEx && hasProperty && !hasStarbucks) {
       const fedExNearProperty = /fedex\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message) ||
                               /(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*(?:propert|warehouse|industrial|facilit).*fedex/i.test(message);
-      
-      const propertyNearFedEx = /(?:propert|warehouse|industrial|facilit).*\s+(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex/i.test(message) ||
-                              /(?:near|close\s+to|within|around|nearby|proximity|closest|nearest)\s+.*fedex.*(?:propert|warehouse|industrial|facilit)/i.test(message);
       
       if (fedExNearProperty) {
         console.log("Detected request for FedEx locations near properties");
@@ -170,7 +251,7 @@ function isLocationQuery(message: string): LocationQuery | null {
           radius,
           isDallasQuery
         };
-      } else if (propertyNearFedEx) {
+      } else {
         console.log("Detected request for properties near FedEx locations");
         return {
           source: 'property' as LocationSourceTarget,
@@ -180,18 +261,44 @@ function isLocationQuery(message: string): LocationQuery | null {
         };
       }
     }
+  }
+  
+  // If all three are mentioned, prioritize the first mentioned
+  if (hasStarbucks && hasFedEx && hasProperty) {
+    const firstMentioned = 
+      message.indexOf('starbucks') < message.indexOf('fedex') && message.indexOf('starbucks') < message.indexOf('propert') ? 'starbucks' :
+      message.indexOf('fedex') < message.indexOf('starbucks') && message.indexOf('fedex') < message.indexOf('propert') ? 'fedex' :
+      'property';
     
-    // Default relationship when both are mentioned but relationship is unclear
-    console.log("Detected both FedEx and properties, defaulting to properties near FedEx");
+    const secondMentioned = 
+      firstMentioned !== 'starbucks' && 
+        (message.indexOf('starbucks') < message.indexOf('fedex') || firstMentioned === 'fedex') && 
+        (message.indexOf('starbucks') < message.indexOf('propert') || firstMentioned === 'property') ? 'starbucks' :
+      firstMentioned !== 'fedex' && 
+        (message.indexOf('fedex') < message.indexOf('starbucks') || firstMentioned === 'starbucks') && 
+        (message.indexOf('fedex') < message.indexOf('propert') || firstMentioned === 'property') ? 'fedex' :
+      'property';
+    
+    console.log(`Detected multiple location types, prioritizing ${firstMentioned} near ${secondMentioned}`);
+    
     return {
-      source: 'property' as LocationSourceTarget,
-      target: 'fedex' as LocationSourceTarget,
+      source: firstMentioned as LocationSourceTarget,
+      target: secondMentioned as LocationSourceTarget,
       radius,
       isDallasQuery
     };
   }
   
-  // If no strong location query is detected but FedEx is mentioned, assume basic FedEx query
+  // If no strong relationship is detected but Starbucks is mentioned
+  if (hasStarbucks) {
+    return { 
+      source: 'starbucks' as LocationSourceTarget, 
+      radius,
+      isDallasQuery
+    };
+  }
+  
+  // If no strong relationship is detected but FedEx is mentioned
   if (hasFedEx) {
     return { 
       source: 'fedex' as LocationSourceTarget, 
@@ -200,7 +307,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  // If no strong location query is detected but property is mentioned, assume basic property query
+  // If no strong relationship is detected but property is mentioned
   if (hasProperty) {
     return { 
       source: 'property' as LocationSourceTarget, 
@@ -228,7 +335,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
-      text: "Welcome to MapChat! I can help you find FedEx locations and industrial properties. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
+      text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?",
       sender: 'bot',
       timestamp: new Date()
     };

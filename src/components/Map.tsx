@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { LOCATION_QUERY_EVENT, LocationQuery } from './Chatbot';
 import { findLocationsWithinRadius, LocationWithCoordinates, checkAndRemoveLayers } from '@/utils/mapUtils';
+import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
@@ -97,6 +98,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
   const [fedExLocations, setFedExLocations] = useState<LocationWithCoordinates[]>([]);
   const [fedExLoaded, setFedExLoaded] = useState<boolean>(false);
+  const [starbucksLoaded, setStarbucksLoaded] = useState<boolean>(false);
   const [displayedProperties, setDisplayedProperties] = useState<LocationWithCoordinates[]>([]);
 
   useEffect(() => {
@@ -288,6 +290,70 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     return locations;
   };
 
+  const addStarbucksLocations = () => {
+    if (!map.current) {
+      console.error("Map not initialized when adding Starbucks locations");
+      return [];
+    }
+    
+    console.log("Adding Starbucks locations markers");
+    const markers: mapboxgl.Marker[] = [];
+    
+    STARBUCKS_LOCATIONS.forEach(location => {
+      const el = document.createElement('div');
+      el.className = 'starbucks-marker';
+      el.style.width = '24px';
+      el.style.height = '24px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#00704A';
+      el.style.border = '2px solid #ffffff';
+      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      el.style.cursor = 'pointer';
+      
+      const iconContainer = document.createElement('div');
+      iconContainer.style.width = '100%';
+      iconContainer.style.height = '100%';
+      iconContainer.style.display = 'flex';
+      iconContainer.style.alignItems = 'center';
+      iconContainer.style.justifyContent = 'center';
+      iconContainer.innerHTML = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+          <line x1="6" y1="2" x2="6" y2="4"></line>
+          <line x1="10" y1="2" x2="10" y2="4"></line>
+          <line x1="14" y1="2" x2="14" y2="4"></line>
+        </svg>
+      `;
+      el.appendChild(iconContainer);
+      
+      const popup = new mapboxgl.Popup({ 
+        offset: [0, 0],
+        closeButton: false,
+        closeOnClick: true
+      }).setHTML(`
+        <div style="padding: 8px; max-width: 200px;">
+          <h3 style="font-weight: bold; margin-bottom: 5px; color: #00704A;">${location.name}</h3>
+          <p style="margin: 0;">${location.description}</p>
+        </div>
+      `);
+      
+      const marker = new mapboxgl.Marker({
+        element: el,
+        anchor: 'center'
+      })
+        .setLngLat(location.coordinates as [number, number])
+        .setPopup(popup)
+        .addTo(map.current);
+      
+      markers.push(marker);
+    });
+    
+    setActiveMarkers(prev => [...prev, ...markers]);
+    setStarbucksLoaded(true);
+    return STARBUCKS_LOCATIONS;
+  };
+
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
     const query = event.detail;
     console.log("Location query received in Map component:", query);
@@ -300,11 +366,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearAllMarkers();
     clearFilteredLocations();
     
+    if (query.source === 'starbucks') {
+      console.log("Showing Starbucks locations");
+      const starbucksLocations = addStarbucksLocations();
+      fitMapToLocations(starbucksLocations.map(loc => loc.coordinates as [number, number]));
+      emitResultsUpdate(starbucksLocations);
+      return;
+    }
+    
     const isPropertyInDallas = 
       query.source === 'property' && 
       event.detail.isDallasQuery === true;
     
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
+    const isStarbucksQuery = query.source === 'starbucks' || query.target === 'starbucks';
     
     if (isPropertyInDallas) {
       console.log("Showing Dallas property locations");
@@ -314,7 +389,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    if (!isFedExQuery && query.source === 'property' && !isPropertyInDallas) {
+    if (!isFedExQuery && !isStarbucksQuery && query.source === 'property' && !isPropertyInDallas) {
       console.log("Non-Dallas property query, not showing property pins");
       emitResultsUpdate([]);
       return;
@@ -327,11 +402,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       sourceData = loadFedExLocations();
       if (query.target === 'property') {
         targetData = INDUSTRIAL_PROPERTIES;
+      } else if (query.target === 'starbucks') {
+        targetData = STARBUCKS_LOCATIONS;
+      }
+    } else if (query.source === 'starbucks') {
+      sourceData = STARBUCKS_LOCATIONS;
+      if (query.target === 'property') {
+        targetData = INDUSTRIAL_PROPERTIES;
+      } else if (query.target === 'fedex') {
+        targetData = loadFedExLocations();
       }
     } else {
       sourceData = INDUSTRIAL_PROPERTIES;
       if (query.target === 'fedex') {
         targetData = loadFedExLocations();
+      } else if (query.target === 'starbucks') {
+        targetData = STARBUCKS_LOCATIONS;
       }
     }
     
@@ -358,13 +444,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         return;
       }
       
-      addFilteredLocations(sourceLocations, query.source, 
-        query.source === 'fedex' ? '#4D148C' : '#333', 
-        query.source === 'fedex' ? '#FF6600' : '#fff');
+      const getMarkerColors = (locationType: string) => {
+        switch(locationType) {
+          case 'fedex':
+            return { bg: '#4D148C', border: '#FF6600' };
+          case 'starbucks':
+            return { bg: '#00704A', border: '#ffffff' };
+          default: // property
+            return { bg: '#333', border: '#fff' };
+        }
+      };
       
-      addFilteredLocations(targetLocations, query.target, 
-        query.target === 'fedex' ? '#4D148C' : '#333', 
-        query.target === 'fedex' ? '#FF6600' : '#fff');
+      const sourceColors = getMarkerColors(query.source);
+      const targetColors = query.target ? getMarkerColors(query.target) : { bg: '#333', border: '#fff' };
+      
+      addFilteredLocations(sourceLocations, query.source, sourceColors.bg, sourceColors.border);
+      addFilteredLocations(targetLocations, query.target!, targetColors.bg, targetColors.border);
       
       addConnectionLines(connections);
       
@@ -380,7 +475,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   const addFilteredLocations = (
     locations: LocationWithCoordinates[],
-    locationType: 'fedex' | 'property',
+    locationType: 'fedex' | 'property' | 'starbucks',
     bgColor: string,
     borderColor: string
   ) => {
@@ -404,6 +499,33 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.border = `2px solid ${borderColor}`;
         el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
         el.style.cursor = 'pointer';
+      } else if (locationType === 'starbucks') {
+        el = document.createElement('div');
+        el.className = `${locationType}-marker-filtered`;
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = bgColor;
+        el.style.border = `2px solid ${borderColor}`;
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+        el.style.cursor = 'pointer';
+        
+        const iconContainer = document.createElement('div');
+        iconContainer.style.width = '100%';
+        iconContainer.style.height = '100%';
+        iconContainer.style.display = 'flex';
+        iconContainer.style.alignItems = 'center';
+        iconContainer.style.justifyContent = 'center';
+        iconContainer.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+            <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+            <line x1="6" y1="2" x2="6" y2="4"></line>
+            <line x1="10" y1="2" x2="10" y2="4"></line>
+            <line x1="14" y1="2" x2="14" y2="4"></line>
+          </svg>
+        `;
+        el.appendChild(iconContainer);
       } else {
         el = document.createElement('div');
         el.className = `${locationType}-marker-filtered`;
@@ -416,6 +538,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.filter = 'drop-shadow(0 0 6px rgba(255,102,0,0.8))';
       }
       
+      const textColor = locationType === 'fedex' ? '#4D148C' : 
+                        locationType === 'starbucks' ? '#00704A' : '';
+      
       const popup = new mapboxgl.Popup({ 
         offset: locationType === 'property' ? [0, -15] : [0, 0],
         closeButton: false,
@@ -423,7 +548,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }).setHTML(`
         <div style="padding: 8px; max-width: 200px;">
           <h3 style="font-weight: bold; margin-bottom: 5px; ${
-            locationType === 'fedex' ? 'color: #4D148C;' : ''
+            textColor ? `color: ${textColor};` : ''
           }">${location.name}</h3>
           <p style="margin: 0;">${location.description}</p>
         </div>
