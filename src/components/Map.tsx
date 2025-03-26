@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -114,6 +115,13 @@ interface MapProps {
 }
 
 type LocationType = 'fedex' | 'property' | 'starbucks';
+
+// Update the LocationQuery interface to include complexSpatialQuery
+declare module './Chatbot' {
+  interface LocationQuery {
+    complexSpatialQuery?: string;
+  }
+}
 
 const Map: React.FC<MapProps> = ({ className = '' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -661,7 +669,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           });
           
           // Convert map values to array
-          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values());
+          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values()) as LocationWithCoordinates[];
           
           if (includeLocsToShow.length > 0) {
             addFilteredLocations(
