@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -357,7 +356,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     return STARBUCKS_LOCATIONS;
   };
 
-  // Add filtered property locations - only show properties that match the query criteria
   const addFilteredLocations = (locations: LocationWithCoordinates[], locationType: string, bgColor: string, borderColor: string) => {
     if (!map.current) {
       console.error("Map not initialized when adding filtered locations");
@@ -368,33 +366,75 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const markers: mapboxgl.Marker[] = [];
     
     locations.forEach(location => {
-      const el = document.createElement('div');
-      el.className = `${locationType}-marker`;
-      el.style.width = locationType === 'property' ? '28px' : '24px';
-      el.style.height = locationType === 'property' ? '28px' : '24px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = bgColor;
-      el.style.border = `2px solid ${borderColor}`;
-      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
-      el.style.cursor = 'pointer';
+      let el;
       
       if (locationType === 'property') {
-        const iconContainer = document.createElement('div');
-        iconContainer.style.width = '100%';
-        iconContainer.style.height = '100%';
-        iconContainer.style.display = 'flex';
-        iconContainer.style.alignItems = 'center';
-        iconContainer.style.justifyContent = 'center';
-        iconContainer.innerHTML = `
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
-            <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
-          </svg>
+        // Create a Google Maps style pin for properties
+        el = document.createElement('div');
+        el.className = `${locationType}-marker`;
+        el.style.width = '24px';
+        el.style.height = '36px';
+        el.style.backgroundImage = `
+          linear-gradient(${bgColor} 50%, transparent 0%)
         `;
-        el.appendChild(iconContainer);
+        el.style.position = 'relative';
+        el.style.cursor = 'pointer';
+        
+        // Create pin shape
+        const pinShape = document.createElement('div');
+        pinShape.style.width = '24px';
+        pinShape.style.height = '24px';
+        pinShape.style.borderRadius = '50% 50% 50% 0';
+        pinShape.style.background = bgColor;
+        pinShape.style.transform = 'rotate(-45deg)';
+        pinShape.style.position = 'absolute';
+        pinShape.style.top = '0';
+        pinShape.style.left = '0';
+        pinShape.style.border = `2px solid ${borderColor}`;
+        pinShape.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        
+        // Create pin center dot
+        const pinCenter = document.createElement('div');
+        pinCenter.style.width = '10px';
+        pinCenter.style.height = '10px';
+        pinCenter.style.background = borderColor;
+        pinCenter.style.borderRadius = '50%';
+        pinCenter.style.position = 'absolute';
+        pinCenter.style.top = '7px';
+        pinCenter.style.left = '7px';
+        
+        pinShape.appendChild(pinCenter);
+        el.appendChild(pinShape);
+      } else {
+        // Keep the circular style for other location types
+        el = document.createElement('div');
+        el.className = `${locationType}-marker`;
+        el.style.width = locationType === 'property' ? '28px' : '24px';
+        el.style.height = locationType === 'property' ? '28px' : '24px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = bgColor;
+        el.style.border = `2px solid ${borderColor}`;
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+        el.style.cursor = 'pointer';
+        
+        if (locationType === 'property') {
+          const iconContainer = document.createElement('div');
+          iconContainer.style.width = '100%';
+          iconContainer.style.height = '100%';
+          iconContainer.style.display = 'flex';
+          iconContainer.style.alignItems = 'center';
+          iconContainer.style.justifyContent = 'center';
+          iconContainer.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+              <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
+            </svg>
+          `;
+          el.appendChild(iconContainer);
+        }
       }
       
       const popup = new mapboxgl.Popup({ 
-        offset: [0, 0],
+        offset: locationType === 'property' ? [0, -20] : [0, 0],
         closeButton: false,
         closeOnClick: true
       }).setHTML(`
@@ -406,7 +446,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: 'center'
+        anchor: locationType === 'property' ? 'bottom' : 'center'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
@@ -421,14 +461,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     );
   };
 
-  // Clear all markers from the map
   const clearAllMarkers = () => {
     console.log("Clearing all markers");
     activeMarkers.forEach(marker => marker.remove());
     setActiveMarkers([]);
   };
 
-  // Clear connection lines and source/layers
   const clearFilteredLocations = () => {
     if (!map.current) return;
     
@@ -440,7 +478,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     setDisplayedProperties([]);
   };
 
-  // Add connection lines between points on the map
   const addConnectionLines = (connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>) => {
     if (!map.current || connections.length === 0) return;
     
@@ -486,7 +523,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     setActiveLayers(prev => [...prev, 'connections-layer']);
   };
 
-  // Fit map view to show all relevant locations
   const fitMapToLocations = (coordinates: [number, number][]) => {
     if (!map.current || coordinates.length === 0) return;
     
@@ -522,7 +558,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     const isStarbucksQuery = query.source === 'starbucks' || query.target === 'starbucks';
     
-    // For Dallas-specific property queries, ONLY show properties in Dallas area
     if (isPropertyInDallas) {
       console.log("Showing Dallas property locations");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
@@ -537,8 +572,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // For standalone property queries (not in Dallas) that don't include FedEx or Starbucks,
-    // don't show any property pins
     if (!isFedExQuery && !isStarbucksQuery && query.source === 'property' && !isPropertyInDallas) {
       console.log("Non-Dallas property query, not showing property pins");
       emitResultsUpdate([]);
@@ -584,7 +617,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     }
     
-    // For standalone Starbucks queries, just show all Starbucks locations
     if (query.source === 'starbucks' && !query.target) {
       console.log("Showing only Starbucks locations with no filtering");
       const starbucksLocations = addStarbucksLocations();
@@ -599,7 +631,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // For standalone FedEx queries, just show all FedEx locations
     if (query.source === 'fedex' && !query.target) {
       console.log("Showing only FedEx locations with no filtering");
       const fedExLocations = addFedExLocations();
@@ -614,7 +645,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // For queries relating to two different location types
     if (targetData) {
       console.log(`Finding ${query.source} locations within ${query.radius} miles of ${query.target} locations`);
       
@@ -641,14 +671,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           case 'starbucks':
             return { bg: '#00704A', border: '#ffffff' };
           default:
-            return { bg: '#333', border: '#fff' };
+            return { bg: '#E53935', border: '#fff' };
         }
       };
       
       const sourceColors = getMarkerColors(query.source);
       const targetColors = query.target ? getMarkerColors(query.target) : { bg: '#333', border: '#fff' };
       
-      // Only add the locations that match our filter criteria
       addFilteredLocations(sourceLocations, query.source, sourceColors.bg, sourceColors.border);
       
       if (targetLocations.length > 0 && query.target) {
@@ -657,14 +686,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addConnectionLines(connections);
       
-      // Fit the map to show only the matching locations
       fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
         return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
           ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
           : [0, 0] as [number, number];
       }));
       
-      // Only emit the filtered results
       emitResultsUpdate([...sourceLocations, ...targetLocations]);
       emitMapContextUpdate({
         visibleLocations: visibleLocationTypes,
@@ -683,11 +710,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // Clear previous markers and results
     clearAllMarkers();
     clearFilteredLocations();
     
-    // Reset visible location types
     const newVisibleTypes: string[] = [];
     setVisibleLocationTypes(newVisibleTypes);
     
@@ -695,11 +720,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log(`Processing complex spatial query: properties within ${includeRadius} miles of ${includeType} and ${excludeRadius} miles away from ${excludeType}`);
     
-    // Load the required location data
     let includeLocations: LocationWithCoordinates[] = [];
     let excludeLocations: LocationWithCoordinates[] = [];
     
-    // Get the include locations data
     if (includeType === 'fedex') {
       includeLocations = loadFedExLocations();
       newVisibleTypes.push('fedex');
@@ -708,7 +731,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       newVisibleTypes.push('starbucks');
     }
     
-    // Get the exclude locations data
     if (excludeType === 'fedex') {
       excludeLocations = loadFedExLocations();
       newVisibleTypes.push('fedex');
@@ -717,10 +739,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       newVisibleTypes.push('starbucks');
     }
     
-    // Properties are always the main entity we're filtering
     const properties = INDUSTRIAL_PROPERTIES;
     
-    // Display the include and exclude location markers
     const getMarkerColors = (locationType: string) => {
       switch(locationType) {
         case 'fedex':
@@ -728,63 +748,52 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         case 'starbucks':
           return { bg: '#00704A', border: '#ffffff' };
         default:
-          return { bg: '#333', border: '#fff' };
+          return { bg: '#E53935', border: '#fff' };
       }
     };
     
     const includeColors = getMarkerColors(includeType);
     const excludeColors = getMarkerColors(excludeType);
     
-    // Add the include location markers
     addFilteredLocations(includeLocations, includeType, includeColors.bg, includeColors.border);
     
-    // Add the exclude location markers
     addFilteredLocations(excludeLocations, excludeType, excludeColors.bg, excludeColors.border);
     
     setVisibleLocationTypes(newVisibleTypes);
     
-    // Find properties that meet the complex criteria
     const withinIncludeRadius = findLocationsWithinRadius(
       properties,
       includeLocations,
       includeRadius
     ).sourceLocations;
     
-    // For exclude condition, we first find all properties within the exclude radius,
-    // then we'll remove them from our results
     const withinExcludeRadius = findLocationsWithinRadius(
       properties,
       excludeLocations,
       excludeRadius
     ).sourceLocations;
     
-    // Get properties that are within include radius but not within exclude radius
     const filteredProperties = withinIncludeRadius.filter(prop => 
       !withinExcludeRadius.some(excluded => 
         excluded.name === prop.name
       )
     );
     
-    // Display the filtered properties ONLY if there are any matching the criteria
     if (filteredProperties.length > 0) {
       console.log(`Found ${filteredProperties.length} properties that match complex criteria`);
       
-      // Add property markers for the filtered properties
-      addFilteredLocations(filteredProperties, 'property', '#333', '#fff');
+      addFilteredLocations(filteredProperties, 'property', '#E53935', '#fff');
       newVisibleTypes.push('property');
       setVisibleLocationTypes([...newVisibleTypes, 'property']);
       
-      // Find connections between properties and include locations
       const connections = findLocationsWithinRadius(
         filteredProperties,
         includeLocations,
         includeRadius
       ).connections;
       
-      // Add connection lines
       addConnectionLines(connections);
       
-      // Fit map to show all relevant points
       const allRelevantLocations = [
         ...filteredProperties,
         ...includeLocations,
@@ -797,7 +806,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           : [0, 0] as [number, number];
       }));
       
-      // Update results
       emitResultsUpdate(filteredProperties);
       emitMapContextUpdate({
         visibleLocations: [...newVisibleTypes, 'property'],
