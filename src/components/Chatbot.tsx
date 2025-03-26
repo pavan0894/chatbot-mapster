@@ -9,6 +9,7 @@ import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/se
 import ChatMessage, { MessageType } from './ChatMessage';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 import { parseComplexSpatialQuery } from '@/utils/mapUtils';
+import { setupDebugEventListener } from '@/utils/debugUtils';
 
 export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
 
@@ -32,8 +33,14 @@ export const COMPLEX_QUERY_EVENT = 'complex-query-event';
 
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
-  const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
+  const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
+    detail: query,
+    bubbles: true,
+    cancelable: true 
+  });
+  console.log("Created location query event:", event);
   window.dispatchEvent(event);
+  console.log("Dispatched location query event");
 }
 
 export function emitComplexQueryEvent(query: LocationQuery) {
@@ -152,9 +159,7 @@ function isLocationQuery(message: string): LocationQuery | null {
   ];
   
   const hasFedEx = fedExPatterns.some(pattern => pattern.test(message));
-  
   const hasStarbucks = starbucksPatterns.some(pattern => pattern.test(message));
-  
   const hasProperty = propertyPatterns.some(pattern => pattern.test(message));
   
   let radius = 5;
@@ -169,7 +174,7 @@ function isLocationQuery(message: string): LocationQuery | null {
   
   const isShowRequest = showPatterns.some(pattern => pattern.test(message));
   
-  if (hasStarbucks && !hasProperty && !hasFedEx) {
+  if (hasStarbucks && (askingForAll || isShowRequest || !hasProximity) && !hasProperty && !hasFedEx) {
     console.log("Detected request for Starbucks locations");
     return { 
       source: 'starbucks' as LocationSourceTarget, 
@@ -356,6 +361,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   }>({});
 
   useEffect(() => {
+    console.log("Setting up debug listeners in Chatbot");
+    setupDebugEventListener(LOCATION_QUERY_EVENT);
+    setupDebugEventListener(COMPLEX_QUERY_EVENT);
+    setupDebugEventListener(API_QUERY_EVENT);
+  }, []);
+
+  useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
       text: "Welcome to MapChat! I can help you find FedEx locations, industrial properties, and Starbucks cafes. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Show me all Starbucks cafes in Dallas\n- Which Starbucks are near warehouses?\n- Show me properties within 2 miles of FedEx and 4 miles away from Starbucks",
@@ -467,16 +479,23 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         if (locationQuery.complexQuery) {
           emitComplexQueryEvent(locationQuery);
         } else {
+          // Make sure events are properly created with bubbling enabled
           const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
             detail: locationQuery,
             bubbles: true,
             cancelable: true
           });
           
+          console.log("Created location query event:", event);
           window.dispatchEvent(event);
+          console.log("Location query event dispatched");
+          
+          // Also use the helper function as a fallback
+          setTimeout(() => {
+            console.log("Dispatching event again using emitLocationQuery helper");
+            emitLocationQuery(locationQuery);
+          }, 100);
         }
-        
-        console.log("Location query event dispatched");
       } else {
         if (input.includes("?") || 
             input.toLowerCase().includes("how many") || 

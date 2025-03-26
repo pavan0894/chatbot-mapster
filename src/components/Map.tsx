@@ -411,7 +411,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     const isPropertyInDallas = 
       query.source === 'property' && 
-      event.detail.isDallasQuery === true;
+      query.isDallasQuery === true;
     
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     const isStarbucksQuery = query.source === 'starbucks' || query.target === 'starbucks';
@@ -475,20 +475,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     }
     
-    if (query.source === 'fedex' && !query.target) {
-      console.log("Showing only FedEx locations with no filtering");
-      const fedExLocations = addFedExLocations();
-      fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
-      emitResultsUpdate(fedExLocations);
-      setVisibleLocationTypes(['fedex']);
-      emitMapContextUpdate({
-        visibleLocations: ['fedex'],
-        query,
-        properties: fedExLocations
-      });
-      return;
-    }
-    
     if (query.source === 'starbucks' && !query.target) {
       console.log("Showing only Starbucks locations with no filtering");
       const starbucksLocations = addStarbucksLocations();
@@ -499,6 +485,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         visibleLocations: ['starbucks'],
         query,
         properties: starbucksLocations
+      });
+      return;
+    }
+    
+    if (query.source === 'fedex' && !query.target) {
+      console.log("Showing only FedEx locations with no filtering");
+      const fedExLocations = addFedExLocations();
+      fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
+      emitResultsUpdate(fedExLocations);
+      setVisibleLocationTypes(['fedex']);
+      emitMapContextUpdate({
+        visibleLocations: ['fedex'],
+        query,
+        properties: fedExLocations
       });
       return;
     }
@@ -875,13 +875,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   };
 
   const clearAllMarkers = () => {
+    console.log("Clearing all markers from map");
     activeMarkers.forEach(marker => marker.remove());
     setActiveMarkers([]);
+    setDisplayedProperties([]);
   };
   
   const clearFilteredLocations = () => {
     if (!map.current) return;
     
+    console.log("Clearing filtered locations and connections");
     activeLayers.forEach(layerId => {
       if (map.current?.getLayer(layerId)) {
         map.current.removeLayer(layerId);
@@ -913,11 +916,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   };
 
   useEffect(() => {
+    console.log("Setting up event listeners in Map component");
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
     window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
     window.addEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
     
     return () => {
+      console.log("Removing event listeners from Map component");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
       window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
       window.removeEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
