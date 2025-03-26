@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -545,8 +546,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       <CardHeader className="py-3 px-4 border-b">
         <CardTitle className="text-lg">Survey Agent</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col h-full p-0">
-        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4">
+      <CardContent className="flex flex-col h-full p-0 relative">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 pb-20">
           <div className="flex flex-col space-y-4">
             {messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
@@ -583,7 +584,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           </div>
         </ScrollArea>
 
-        <div className="p-4 border-t border-border mt-auto">
+        <div className="p-4 border-t border-border w-full absolute bottom-0 bg-background">
           <div className="flex items-center space-x-2">
             <Input
               id="chat-input"
