@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -107,7 +108,7 @@ export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
   console.log("Emitting map results update with properties:", properties);
   const event = new CustomEvent(MAP_RESULTS_UPDATE_EVENT, { 
     detail: { properties } 
-  } as CustomEventInit);
+  });
   window.dispatchEvent(event);
 }
 
@@ -119,7 +120,7 @@ export function emitMapContextUpdate(context: {
   console.log("Emitting map context update:", context);
   const event = new CustomEvent('map-context-update', { 
     detail: context 
-  } as CustomEventInit);
+  });
   window.dispatchEvent(event);
 }
 
@@ -355,6 +356,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const { includeType, excludeType, includeRadius, excludeRadius } = query.complexSpatialQuery;
       
+      console.log(`Complex spatial query: Find properties within ${includeRadius} miles of ${includeType} and at least ${excludeRadius} miles from ${excludeType}`);
+      
       let includeLocations: LocationWithCoordinates[] = [];
       let excludeLocations: LocationWithCoordinates[] = [];
       
@@ -376,6 +379,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         excludeLocations = [...INDUSTRIAL_PROPERTIES];
       }
       
+      // Use enhanced spatial query function with more diagnostic info
       const result = findLocationsWithComplexSpatialQuery(
         INDUSTRIAL_PROPERTIES,
         includeLocations,
@@ -384,8 +388,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         excludeRadius
       );
       
+      console.log(`Found ${result.resultLocations.length} properties that meet complex spatial criteria`);
+      
+      // Add primary properties that meet criteria
       addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF');
       
+      // Add connected include locations (e.g., FedEx)
       const connectedIncludeLocations = new Set<string>();
       result.includeConnections.forEach(conn => {
         const targetCoord = conn.target.toString();
@@ -394,16 +402,34 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addConnectionLines(result.includeConnections);
       
+      // Add include locations (e.g., FedEx)
       const visibleIncludeLocations = includeLocations.filter(loc => {
         const coord = getCoordinates(loc).toString();
         return connectedIncludeLocations.has(coord);
       });
       
-      addFilteredLocations(visibleIncludeLocations, 'fedex', '#FFFFFF', '#FF6600');
+      if (includeType === 'fedex') {
+        addFilteredLocations(visibleIncludeLocations, 'fedex', '#FFFFFF', '#FF6600');
+      } else if (includeType === 'starbucks') {
+        addFilteredLocations(visibleIncludeLocations, 'starbucks', '#00704A', '#ffffff');
+      }
       
-      const allCoordinates = [...result.resultLocations, ...visibleIncludeLocations].map(loc => loc.coordinates as [number, number]);
+      // For debugging - show excluded locations with lighter color
+      if (result.excludeConnections && result.excludeConnections.length > 0) {
+        console.log(`Showing ${result.excludeConnections.length} exclude connections for debugging`);
+        addExcludeConnectionLines(result.excludeConnections);
+      }
+      
+      // Determine what's visible to fit the map
+      const allCoordinates = [
+        ...result.resultLocations.map(loc => loc.coordinates as [number, number]),
+        ...result.includeConnections.map(conn => conn.target),
+      ];
+      
+      // Fit map to all visible elements
       fitMapToLocations(allCoordinates);
       
+      // Send results for display in sidebar
       emitResultsUpdate(result.resultLocations);
     };
     
@@ -935,8 +961,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const clearFilteredLocations = () => {
     if (!map.current) return;
     
-    const lineLayerIds = ['connections-layer'];
+    const lineLayerIds = ['connections-layer', 'exclude-connections-layer'];
     checkAndRemoveLayers(map.current, lineLayerIds, 'connections');
+    checkAndRemoveLayers(map.current, lineLayerIds, 'exclude-connections');
     
     setActiveLayers([]);
     setDisplayedProperties([]);
@@ -982,6 +1009,49 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     setActiveLayers(prev => [...prev, 'connections-layer']);
+  };
+  
+  // New function to add connections to excluded locations with different style
+  const addExcludeConnectionLines = (connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>) => {
+    if (!map.current || connections.length === 0) return;
+    
+    console.log(`Adding ${connections.length} exclusion connection lines to map`);
+    
+    const geojson = {
+      type: 'FeatureCollection',
+      features: connections.map(conn => ({
+        type: 'Feature',
+        properties: {
+          distance: conn.distance
+        },
+        geometry: {
+          type: 'LineString',
+          coordinates: [conn.source, conn.target]
+        }
+      }))
+    };
+    
+    const lineLayerIds = ['exclude-connections-layer'];
+    checkAndRemoveLayers(map.current, lineLayerIds, 'exclude-connections');
+    
+    map.current.addSource('exclude-connections', {
+      type: 'geojson',
+      data: geojson as any
+    });
+    
+    map.current.addLayer({
+      id: 'exclude-connections-layer',
+      type: 'line',
+      source: 'exclude-connections',
+      paint: {
+        'line-color': '#ff0000',
+        'line-width': 1,
+        'line-opacity': 0.3,
+        'line-dasharray': [1, 2]
+      }
+    });
+    
+    setActiveLayers(prev => [...prev, 'exclude-connections-layer']);
   };
 
   const fitMapToLocations = (coordinates: [number, number][]) => {

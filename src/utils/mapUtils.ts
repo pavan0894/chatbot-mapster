@@ -1,3 +1,4 @@
+
 // Convert degrees to radians
 function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
@@ -124,10 +125,15 @@ export function findLocationsWithComplexSpatialQuery(
   excludeRadius: number
 ): {
   resultLocations: LocationWithCoordinates[],
-  includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
+  includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }>,
+  excludeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
 } {
   const resultLocations: LocationWithCoordinates[] = [];
   const includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }> = [];
+  const excludeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }> = [];
+  
+  console.log(`Searching for properties within ${includeRadius} miles of include locations and at least ${excludeRadius} miles from exclude locations`);
+  console.log(`Primary locations: ${primaryLocations.length}, Include locations: ${includeLocations.length}, Exclude locations: ${excludeLocations.length}`);
   
   // For each primary location (e.g., properties)
   primaryLocations.forEach(primary => {
@@ -139,6 +145,7 @@ export function findLocationsWithComplexSpatialQuery(
     let closestIncludeLocation: LocationWithCoordinates | null = null;
     let closestIncludeDistance = Number.MAX_VALUE;
     
+    // Check all include locations (e.g., FedEx)
     includeLocations.forEach(include => {
       const includeCoords = getCoordinates(include);
       const distance = calculateDistance(
@@ -161,10 +168,14 @@ export function findLocationsWithComplexSpatialQuery(
     });
     
     // If not within any include location's radius, skip this primary location
-    if (!isWithinIncludeRadius) return;
+    if (!isWithinIncludeRadius) {
+      return;
+    }
     
-    // Check if all exclude locations are outside radius
+    // Check if ALL exclude locations are outside radius
     let isOutsideExcludeRadius = true;
+    let closestExcludeLocation: LocationWithCoordinates | null = null;
+    let closestExcludeDistance = Number.MAX_VALUE;
     
     for (const exclude of excludeLocations) {
       const excludeCoords = getCoordinates(exclude);
@@ -175,15 +186,21 @@ export function findLocationsWithComplexSpatialQuery(
         excludeCoords[1]
       );
       
-      // If any exclude location is within exclude radius, skip this primary location
+      // If any exclude location is within exclude radius, this property doesn't qualify
       if (distance <= excludeRadius) {
         isOutsideExcludeRadius = false;
-        break;
+        
+        // Still track the closest one for visualization
+        if (distance < closestExcludeDistance) {
+          closestExcludeDistance = distance;
+          closestExcludeLocation = exclude;
+        }
       }
     }
     
     // If this primary location meets both criteria, add it to results
     if (isWithinIncludeRadius && isOutsideExcludeRadius && closestIncludeLocation) {
+      console.log(`Found property "${primary.name}" that meets criteria`);
       resultLocations.push(primary);
       
       // Add connection to the closest include location
@@ -192,12 +209,24 @@ export function findLocationsWithComplexSpatialQuery(
         target: getCoordinates(closestIncludeLocation),
         distance: closestIncludeDistance
       });
+    } else if (isWithinIncludeRadius && !isOutsideExcludeRadius && closestIncludeLocation && closestExcludeLocation) {
+      console.log(`Property "${primary.name}" is near include but also too near exclude (${closestExcludeDistance.toFixed(2)} miles from exclude)`);
+      
+      // Add connection to closest exclude location for debugging
+      excludeConnections.push({
+        source: primaryCoords,
+        target: getCoordinates(closestExcludeLocation),
+        distance: closestExcludeDistance
+      });
     }
   });
   
+  console.log(`Found ${resultLocations.length} properties that meet all criteria`);
+  
   return {
     resultLocations,
-    includeConnections
+    includeConnections,
+    excludeConnections
   };
 }
 
@@ -255,6 +284,29 @@ export function parseComplexSpatialQuery(query: string): {
     primaryType = 'property'; // We're treating industrial facilities as properties
   }
   
+  // Improved pattern matching for complex queries like "within X miles of A and Y miles away from B"
+  const complexPattern = /within\s+(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)(?:.*?)(?:and|&|but)(?:.*?)(\d+)\s*miles?\s*(?:away|far)(?:.*?)(?:from)\s*(\w+)/i;
+  const complexMatch = queryLower.match(complexPattern);
+  
+  if (complexMatch) {
+    console.log("Complex pattern matched:", complexMatch);
+    const includeRadius = parseInt(complexMatch[1], 10);
+    const includeType = normalizeLocationType(complexMatch[2]);
+    const excludeRadius = parseInt(complexMatch[3], 10);
+    const excludeType = normalizeLocationType(complexMatch[4]);
+    
+    if (includeType && excludeType) {
+      console.log(`Complex query detected: ${includeRadius} miles of ${includeType} and ${excludeRadius} miles away from ${excludeType}`);
+      return {
+        primaryType,
+        includeType,
+        excludeType,
+        includeRadius,
+        excludeRadius
+      };
+    }
+  }
+  
   // Check for specific patterns like "near X but away from Y"
   const proximityPattern = /(near|close\s+to|within|next\s+to)\s+(\w+).*?(away\s+from|far\s+from|not\s+near|outside)\s+(\w+)/i;
   const proximityMatch = queryLower.match(proximityPattern);
@@ -271,15 +323,16 @@ export function parseComplexSpatialQuery(query: string): {
       const nearRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(?:of|from|to)\s*\b(fedex|starbucks)\b/i);
       const farRadiusMatch = queryLower.match(/(\d+)\s*miles?\s*(away|far)\s*(?:from)\s*\b(fedex|starbucks)\b/i);
       
-      if (nearRadiusMatch && nearRadiusMatch[2].toLowerCase().includes(includeType)) {
+      if (nearRadiusMatch && nearRadiusMatch[2].toLowerCase().includes(String(includeType))) {
         includeRadius = parseInt(nearRadiusMatch[1], 10);
       }
       
-      if (farRadiusMatch && farRadiusMatch[2].toLowerCase().includes(excludeType)) {
+      if (farRadiusMatch && farRadiusMatch[3].toLowerCase().includes(String(excludeType))) {
         excludeRadius = parseInt(farRadiusMatch[1], 10);
       }
     }
   } else {
+    // Check each type separately if not found with combined pattern
     // Detect include location type
     if (queryLower.includes('within') || queryLower.includes('near') || queryLower.includes('close to')) {
       if (queryLower.includes('fedex')) {
