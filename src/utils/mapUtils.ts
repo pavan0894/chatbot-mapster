@@ -1,3 +1,4 @@
+
 // Convert degrees to radians
 function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
@@ -124,7 +125,7 @@ export function findLocationsWithComplexSpatialQuery(
   excludeRadius: number
 ): {
   resultLocations: LocationWithCoordinates[],
-  includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }>,
+  includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
 } {
   const resultLocations: LocationWithCoordinates[] = [];
   const includeConnections: Array<{ source: [number, number]; target: [number, number]; distance: number }> = [];

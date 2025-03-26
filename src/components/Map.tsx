@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -10,7 +11,8 @@ import {
   getCoordinates,
   findLocationsWithTripleTypeProximity,
   findLocationsWithComplexSpatialQuery,
-  parseComplexSpatialQuery
+  parseComplexSpatialQuery,
+  calculateDistance
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
@@ -132,7 +134,12 @@ type LocationType = 'fedex' | 'property' | 'starbucks';
 
 // Define the extension for LocationQuery to include complexSpatialQuery
 interface LocationQueryExtension {
-  complexSpatialQuery?: string;
+  complexSpatialQuery?: {
+    includeType: LocationSourceTarget;
+    excludeType: LocationSourceTarget;
+    includeRadius: number;
+    excludeRadius: number;
+  };
   multiTargetQuery?: {
     targetTypes: {
       type: LocationSourceTarget;
@@ -822,16 +829,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addFilteredLocations(result.resultLocations, 'property', '#2563EB', '#1E40AF');
       
-      addConnectionLines(result.connections);
+      addConnectionLines(result.includeConnections);
       
       const coordinatesToShow = [
         ...result.resultLocations.map(p => getCoordinates(p)),
-        ...result.connections.map(c => c.target)
+        ...result.includeConnections.map(c => c.target)
       ];
       
       fitMapToLocations(coordinatesToShow);
       emitResultsUpdate(result.resultLocations);
-      setVisibleLocationTypes(['property', includeType, excludeType]);
+      setVisibleLocationTypes(['property', includeType, excludeType].filter(t => t !== 'property'));
     } else {
       console.log("No properties found matching the complex spatial criteria");
       console.log("Showing fallback properties instead");
@@ -874,23 +881,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       fitMapToLocations(coordinatesToShow);
       emitResultsUpdate(COMPLEX_QUERY_FALLBACK_PROPERTIES);
-      setVisibleLocationTypes(['property', includeType, excludeType]);
+      setVisibleLocationTypes(['property', includeType, excludeType].filter(t => t !== 'property'));
     }
     
     setCurrentQuery(query);
     emitMapContextUpdate({ query });
-  };
-
-  const calculateDistance = (lon1: number, lat1: number, lon2: number, lat2: number): number => {
-    const R = 3958.8;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
   };
 
   const handleMultiTargetQuery = (event: CustomEvent<LocationQuery>) => {
@@ -968,15 +963,25 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const query = event.detail;
     console.log("Map component received dynamic query:", query);
     
+    if (!query.dynamicQuery) {
+      console.error("Query doesn't contain dynamicQuery data");
+      return;
+    }
+    
     clearAllMarkers();
     clearFilteredLocations();
     
     const { primaryType, targetTypes } = query.dynamicQuery;
     
-    console.log(`Finding properties near primary type: ${primaryType} and target types: ${targetTypes.map(t => t.type).join(', ')}`);
+    // Use Object.entries to get array of [key, value] pairs for iteration
+    const targetTypeEntries = Object.entries(targetTypes)
+      .filter(([key]) => key === 'fedex' || key === 'starbucks')
+      .map(([key, value]) => ({ type: key as LocationSourceTarget, ...value }));
     
-    const primaryTypeLocations = [];
-    const targetTypeLocations = [];
+    console.log(`Finding properties near primary type: ${primaryType} and target types: ${targetTypeEntries.map(t => t.type).join(', ')}`);
+    
+    // Use let instead of const since we need to reassign
+    let primaryTypeLocations: LocationWithCoordinates[] = [];
     
     if (primaryType === 'fedex') {
       primaryTypeLocations = fedExLoaded ? fedExLocations : addFedExLocations();
@@ -984,20 +989,33 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       primaryTypeLocations = starbucksLoaded ? STARBUCKS_LOCATIONS : addStarbucksLocations();
     }
     
-    targetTypes.forEach(targetType => {
-      let targetTypeLocations = [];
+    // Process each target type
+    targetTypeEntries.forEach(targetTypeEntry => {
+      let currentTargetLocations: LocationWithCoordinates[] = [];
       
-      if (targetType.type === 'fedex') {
-        targetTypeLocations = fedExLoaded ? fedExLocations : addFedExLocations();
-      } else if (targetType.type === 'starbucks') {
-        targetTypeLocations = starbucksLoaded ? STARBUCKS_LOCATIONS : addStarbucksLocations();
+      if (targetTypeEntry.type === 'fedex') {
+        currentTargetLocations = fedExLoaded ? fedExLocations : addFedExLocations();
+      } else if (targetTypeEntry.type === 'starbucks') {
+        currentTargetLocations = starbucksLoaded ? STARBUCKS_LOCATIONS : addStarbucksLocations();
       }
+      
+      // Create the target config for this specific type
+      const targetConfig = {
+        [targetTypeEntry.type]: {
+          locations: currentTargetLocations,
+          radius: targetTypeEntry.radius
+        }
+      };
       
       const result = findLocationsWithTripleTypeProximity(
         INDUSTRIAL_PROPERTIES,
-        primaryTypeLocations,
-        targetTypeLocations,
-        targetType.radius
+        {
+          [primaryType]: {
+            locations: primaryTypeLocations,
+            radius: 5 // Default radius if not specified
+          },
+          ...targetConfig
+        }
       );
       
       if (result.resultLocations.length > 0) {
@@ -1014,7 +1032,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         emitResultsUpdate(result.resultLocations);
         
-        setVisibleLocationTypes(['property', primaryType, targetType.type]);
+        setVisibleLocationTypes(['property', primaryType, targetTypeEntry.type].filter(t => t !== 'property'));
       }
     });
     
