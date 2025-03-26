@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -15,8 +14,6 @@ import {
   calculateDistance
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
-
-export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
@@ -379,7 +376,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         excludeLocations = [...INDUSTRIAL_PROPERTIES];
       }
       
-      // Use enhanced spatial query function with more diagnostic info
       const result = findLocationsWithComplexSpatialQuery(
         INDUSTRIAL_PROPERTIES,
         includeLocations,
@@ -390,10 +386,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       console.log(`Found ${result.resultLocations.length} properties that meet complex spatial criteria`);
       
-      // Add primary properties that meet criteria
       addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF');
       
-      // Add connected include locations (e.g., FedEx)
       const connectedIncludeLocations = new Set<string>();
       result.includeConnections.forEach(conn => {
         const targetCoord = conn.target.toString();
@@ -402,7 +396,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addConnectionLines(result.includeConnections);
       
-      // Add include locations (e.g., FedEx)
       const visibleIncludeLocations = includeLocations.filter(loc => {
         const coord = getCoordinates(loc).toString();
         return connectedIncludeLocations.has(coord);
@@ -414,22 +407,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         addFilteredLocations(visibleIncludeLocations, 'starbucks', '#00704A', '#ffffff');
       }
       
-      // For debugging - show excluded locations with lighter color
       if (result.excludeConnections && result.excludeConnections.length > 0) {
         console.log(`Showing ${result.excludeConnections.length} exclude connections for debugging`);
         addExcludeConnectionLines(result.excludeConnections);
       }
       
-      // Determine what's visible to fit the map
       const allCoordinates = [
         ...result.resultLocations.map(loc => loc.coordinates as [number, number]),
         ...result.includeConnections.map(conn => conn.target),
       ];
       
-      // Fit map to all visible elements
       fitMapToLocations(allCoordinates);
       
-      // Send results for display in sidebar
       emitResultsUpdate(result.resultLocations);
     };
     
@@ -758,7 +747,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log(`Adding ${locations.length} ${locationType} locations`);
     const markers: mapboxgl.Marker[] = [];
     
-    // Update visible location types
     setVisibleLocationTypes(prev => {
       if (!prev.includes(locationType)) {
         return [...prev, locationType];
@@ -766,12 +754,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return prev;
     });
     
-    // Add markers for each location
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = `${locationType}-marker`;
       
-      // Use custom icon for FedEx and Starbucks
       if (locationType === 'fedex') {
         el.style.width = '32px';
         el.style.height = '32px';
@@ -791,7 +777,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.backgroundPosition = 'center';
         el.style.border = '2px solid #00704A';
       } else {
-        // Default marker style for properties
         el.style.width = '24px';
         el.style.height = '24px';
         el.style.borderRadius = '50%';
@@ -799,7 +784,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.border = `2px solid ${borderColor}`;
       }
       
-      // Create the marker
       const marker = new mapboxgl.Marker(el)
         .setLngLat(location.coordinates as [number, number])
         .setPopup(
@@ -811,10 +795,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       markers.push(marker);
     });
     
-    // Update active markers state
     setActiveMarkers(prev => [...prev, ...markers]);
     
-    // If these are properties, update the displayed properties state too
     if (locationType === 'property') {
       setDisplayedProperties(locations);
     }
@@ -823,16 +805,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const clearAllMarkers = () => {
     console.log("Clearing all markers");
     
-    // Remove all markers from the map
     activeMarkers.forEach(marker => marker.remove());
-    
-    // Reset the active markers array
     setActiveMarkers([]);
-    
-    // Clear displayed properties
     setDisplayedProperties([]);
-    
-    // Reset visible location types
     setVisibleLocationTypes([]);
   };
 
@@ -841,13 +816,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log("Clearing filtered locations and connection lines");
     
-    // Check and remove any existing layers for connections
     checkAndRemoveLayers(map.current, activeLayers, 'connections');
-    
-    // Reset active layers
     setActiveLayers([]);
-    
-    // Clear all markers
     clearAllMarkers();
   };
 
@@ -863,25 +833,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log(`Adding ${connections.length} connection lines`);
     
-    // Create layers for connection lines
     const layerId = 'connections-layer';
     const sourceId = 'connections';
     
-    // Remove any existing layers before adding new ones
     checkAndRemoveLayers(map.current, [...activeLayers, layerId], sourceId);
     
-    // Create features for connection lines
     const features = connections.map(conn => {
       const targetType = conn.targetType || 'default';
       
-      let lineColor = '#4B5563'; // Default gray
+      let lineColor = '#4B5563';
       
       if (targetType === 'fedex') {
-        lineColor = '#FF6600'; // FedEx orange
+        lineColor = '#FF6600';
       } else if (targetType === 'starbucks') {
-        lineColor = '#00704A'; // Starbucks green
+        lineColor = '#00704A';
       } else if (targetType === 'property') {
-        lineColor = '#3B82F6'; // Blue
+        lineColor = '#3B82F6';
       }
       
       return {
@@ -899,7 +866,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       };
     });
     
-    // Add source
     map.current.addSource(sourceId, {
       type: 'geojson',
       data: {
@@ -908,7 +874,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     });
     
-    // Add line layer
     map.current.addLayer({
       id: layerId,
       type: 'line',
@@ -924,7 +889,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     });
     
-    // Update active layers
     setActiveLayers(prev => [...prev, layerId]);
   };
 
@@ -939,14 +903,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log(`Adding ${connections.length} exclude connection lines`);
     
-    // Create layers for connection lines
     const layerId = 'exclude-connections-layer';
     const sourceId = 'exclude-connections';
     
-    // Remove any existing layers before adding new ones
     checkAndRemoveLayers(map.current, [...activeLayers, layerId], sourceId);
     
-    // Create features for connection lines
     const features = connections.map(conn => ({
       type: 'Feature' as const,
       properties: {
@@ -959,7 +920,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     }));
     
-    // Add source
     map.current.addSource(sourceId, {
       type: 'geojson',
       data: {
@@ -968,7 +928,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     });
     
-    // Add line layer
     map.current.addLayer({
       id: layerId,
       type: 'line',
@@ -978,13 +937,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         'line-cap': 'round'
       },
       paint: {
-        'line-color': '#EF4444', // Red for excluded
+        'line-color': '#EF4444',
         'line-width': 1.5,
         'line-dasharray': [1, 2]
       }
     });
     
-    // Update active layers
     setActiveLayers(prev => [...prev, layerId]);
   };
 
@@ -997,12 +955,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log(`Fitting map to ${coordinates.length} coordinates`);
     
     try {
-      // Create a bounding box from all coordinates
       const bounds = coordinates.reduce((bbox, coord) => {
         return bbox.extend(coord);
       }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
       
-      // Add padding to fit the entire view
       map.current.fitBounds(bounds, {
         padding: 50,
         maxZoom: 15
