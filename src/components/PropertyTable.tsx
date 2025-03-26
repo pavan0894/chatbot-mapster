@@ -13,6 +13,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
   const [properties, setProperties] = useState<LocationWithCoordinates[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [query, setQuery] = useState<string>('');
+  const [hasQueried, setHasQueried] = useState<boolean>(false);
 
   useEffect(() => {
     console.log("PropertyTable: Setting up event listeners");
@@ -23,6 +24,7 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
       console.log("PropertyTable received location query:", query);
       setQuery(`${query.source}${query.target ? ` near ${query.target}` : ''} within ${query.radius} miles`);
       setIsLoading(true);
+      setHasQueried(true);
       
       // Reset properties to avoid showing old results during loading
       setProperties([]);
@@ -81,7 +83,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
           <TableCaption>
             {properties.length > 0 
               ? `${properties.length} properties found` 
-              : "No properties to display. Try a location query in the chat."}
+              : hasQueried 
+                ? "No matching properties found for your query"
+                : "Ask a question in the chat to find properties"}
           </TableCaption>
           <TableHeader>
             <TableRow>
@@ -105,7 +109,9 @@ const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
             {properties.length === 0 && !isLoading && (
               <TableRow>
                 <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
-                  No properties to display. Try a location query in the chat.
+                  {hasQueried 
+                    ? "No matching properties found for your query. Try a different search."
+                    : "Ask a question in the chat to find properties."}
                 </TableCell>
               </TableRow>
             )}
