@@ -26,24 +26,56 @@ export function emitLocationQuery(query: LocationQuery) {
   window.dispatchEvent(event);
 }
 
-// Function to determine if a message is a location query
+// Enhanced function to determine if a message is a location query with better FedEx detection
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
   
-  // Check for FedEx-related queries specifically
-  const fedExKeywords = [
-    'fedex', 'fed ex', 'federal express', 'shipping center', 
-    'shipping location', 'shipping service', 'delivery service'
+  // More comprehensive FedEx detection patterns
+  const fedExPatterns = [
+    // Direct mentions
+    /\bfedex\b/i, 
+    /\bfed\s*ex\b/i, 
+    /\bfederal\s*express\b/i,
+    
+    // Service-related
+    /shipping\s+(center|location|service)/i,
+    /delivery\s+service/i,
+    /package\s+(service|delivery)/i,
+    /express\s+(shipping|delivery)/i,
+    
+    // Query patterns
+    /where\s+(?:are|is)\s+(?:the\s+)?fedex/i,
+    /show\s+(?:me\s+)?(?:all\s+)?fedex/i,
+    /find\s+(?:me\s+)?(?:all\s+)?fedex/i,
+    /locate\s+(?:all\s+)?fedex/i,
+    /display\s+(?:all\s+)?fedex/i,
+    /fedex\s+locations/i,
+    /fedex\s+(?:near|close|around)/i
   ];
   
-  const hasFedEx = fedExKeywords.some(keyword => message.includes(keyword));
-  
-  const propertyKeywords = [
-    'property', 'properties', 'industrial', 'warehouse', 
-    'warehouses', 'logistics', 'distribution'
+  const propertyPatterns = [
+    // Direct mentions
+    /\bproperty\b/i, 
+    /\bproperties\b/i, 
+    /\bindustrial\b/i,
+    /\bwarehouse[s]?\b/i,
+    /\blogistics\b/i,
+    /\bdistribution\b/i,
+    /\bmanufacturing\b/i,
+    /\bfacility\b/i,
+    /\bindustrial\s+park\b/i,
+    /\bbusiness\s+park\b/i,
+    
+    // Query patterns
+    /where\s+(?:are|is)\s+(?:the\s+)?(?:industrial\s+)?properties/i,
+    /show\s+(?:me\s+)?(?:all\s+)?(?:industrial\s+)?properties/i
   ];
   
-  const hasProperty = propertyKeywords.some(keyword => message.includes(keyword));
+  // Check for FedEx mentions
+  const hasFedEx = fedExPatterns.some(pattern => pattern.test(message));
+  
+  // Check for property mentions
+  const hasProperty = propertyPatterns.some(pattern => pattern.test(message));
   
   // Determine radius (default to 5 miles)
   let radius = 5;
@@ -52,36 +84,33 @@ function isLocationQuery(message: string): LocationQuery | null {
     radius = parseInt(radiusMatch[1], 10);
   }
   
-  // Check for specific requests to see all FedEx locations
-  const showAllFedEx = message.match(/show\s+(?:all\s+)?fedex/i) || 
-                       message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i) ||
-                       message.match(/fedex\s+locations/i) ||
-                       message.match(/find\s+fedex/i) ||
-                       message.match(/locate\s+fedex/i);
-  
-  if (showAllFedEx || (hasFedEx && !hasProperty)) {
+  // Specific request for showing FedEx locations (highest priority)
+  if (hasFedEx && !hasProperty) {
+    console.log("Detected request for FedEx locations");
     return { source: 'fedex' as LocationSourceTarget, radius };
   }
   
-  // If no FedEx mentioned but properties are, return property source
+  // If only properties are mentioned, return property source
   if (!hasFedEx && hasProperty) {
+    console.log("Detected request for property locations");
     return { source: 'property' as LocationSourceTarget, radius };
   }
   
-  // If both are mentioned, determine relationship
+  // If both FedEx and properties are mentioned, determine the relationship
   if (hasFedEx && hasProperty) {
-    // Check for specific relationship patterns
-    if ((message.includes('fedex near') || message.includes('fedex close to') || 
-        message.includes('fedex within') || message.includes('fedex around')) && hasProperty) {
+    // Attempt to determine relationship direction
+    const fedExNearProperty = /fedex\s+(?:near|close\s+to|within|around)\s+.*(?:propert|warehouse|industrial|facilit)/i.test(message);
+    const propertyNearFedEx = /(?:propert|warehouse|industrial|facilit).*\s+(?:near|close\s+to|within|around)\s+.*fedex/i.test(message);
+    
+    if (fedExNearProperty) {
+      console.log("Detected request for FedEx locations near properties");
       return {
         source: 'fedex' as LocationSourceTarget,
         target: 'property' as LocationSourceTarget,
         radius
       };
-    } else if ((message.includes('property near') || message.includes('properties near') || 
-               message.includes('warehouse near') || message.includes('warehouses near') || 
-               message.includes('industrial near') || message.includes('properties close to') || 
-               message.includes('properties within') || message.includes('properties around')) && hasFedEx) {
+    } else if (propertyNearFedEx) {
+      console.log("Detected request for properties near FedEx locations");
       return {
         source: 'property' as LocationSourceTarget,
         target: 'fedex' as LocationSourceTarget,
@@ -89,6 +118,7 @@ function isLocationQuery(message: string): LocationQuery | null {
       };
     } else {
       // Default relationship when both are mentioned but relationship is unclear
+      console.log("Detected both FedEx and properties, defaulting to properties near FedEx");
       return {
         source: 'property' as LocationSourceTarget,
         target: 'fedex' as LocationSourceTarget,
@@ -97,6 +127,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     }
   }
   
+  // If it's not a location query we recognize
   return null;
 }
 
