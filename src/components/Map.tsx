@@ -75,6 +75,17 @@ const FEDEX_LOCATIONS: LocationWithCoordinates[] = [
   { name: "FedEx Express - Rockwall", coordinates: [-96.4597, 32.9290], description: "Express shipping center" }
 ];
 
+// Custom event for updating the property table
+export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
+
+// Emit results update event
+export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
+  const event = new CustomEvent(MAP_RESULTS_UPDATE_EVENT, { 
+    detail: { properties } 
+  });
+  window.dispatchEvent(event);
+}
+
 interface MapProps {
   className?: string;
 }
@@ -228,6 +239,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Save the markers reference
     setActiveMarkers(prev => [...prev, ...markers]);
+    
+    // Emit results update with all industrial properties
+    emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 
   // Function to add FedEx location markers to the map
@@ -321,11 +335,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         addFedExLocations();
         // Fit the map to show all FedEx locations
         fitMapToLocations(FEDEX_LOCATIONS.map(loc => loc.coordinates as [number, number]));
+        // Update the table with fedex locations
+        emitResultsUpdate(FEDEX_LOCATIONS);
         return;
       } else if (query.source === 'property') {
         addIndustrialProperties();
         // Fit the map to show all properties
         fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+        // Update the table with all industrial properties
+        emitResultsUpdate(INDUSTRIAL_PROPERTIES);
         return;
       }
     }
@@ -370,6 +388,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         : [0, 0] as [number, number];
       return coords;
     }));
+    
+    // Update table with property results
+    // When searching for properties, show the properties; when searching for FedEx, show properties near them
+    if (query.source === 'property') {
+      emitResultsUpdate(sourceLocations);
+    } else if (query.target === 'property') {
+      emitResultsUpdate(targetLocations);
+    }
   };
 
   // Add filtered locations to the map
@@ -602,6 +628,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     // Re-add all markers
     addIndustrialProperties();
     addFedExLocations();
+    
+    // Update table with all industrial properties 
+    emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 
   // Listen for location query events

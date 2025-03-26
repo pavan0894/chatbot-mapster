@@ -3,6 +3,7 @@ import React from 'react';
 import PageTransition from '@/components/PageTransition';
 import Map from '@/components/Map';
 import Chatbot from '@/components/Chatbot';
+import PropertyTable from '@/components/PropertyTable';
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable';
 
 const Index = () => {
@@ -26,23 +27,31 @@ const Index = () => {
           </div>
         </header>
 
-        {/* Main Content - Full height minus header and footer */}
-        <main className="flex-1 w-full overflow-hidden">
-          <ResizablePanelGroup
-            direction="horizontal"
-            className="h-full"
-          >
-            <ResizablePanel defaultSize={40} minSize={30} className="h-full">
-              <Chatbot className="h-full rounded-none" />
-            </ResizablePanel>
-            
-            <ResizableHandle withHandle />
-            
-            <ResizablePanel defaultSize={60} minSize={40} className="h-full">
-              <Map className="h-full rounded-none" />
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </main>
+        {/* Main Content - Split into two sections */}
+        <div className="flex-1 w-full overflow-hidden flex flex-col">
+          {/* Top section with map and chatbot */}
+          <div className="flex-1 min-h-0">
+            <ResizablePanelGroup
+              direction="horizontal"
+              className="h-full"
+            >
+              <ResizablePanel defaultSize={40} minSize={30} className="h-full">
+                <Chatbot className="h-full rounded-none" />
+              </ResizablePanel>
+              
+              <ResizableHandle withHandle />
+              
+              <ResizablePanel defaultSize={60} minSize={40} className="h-full">
+                <Map className="h-full rounded-none" />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+          
+          {/* Bottom section with property table */}
+          <div className="h-1/3 min-h-[250px] overflow-auto border-t border-border">
+            <PropertyTable />
+          </div>
+        </div>
 
         {/* Minimal Footer */}
         <footer className="w-full py-2 px-6 border-t border-border text-center text-xs text-muted-foreground shrink-0">
