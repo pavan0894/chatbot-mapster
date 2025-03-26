@@ -7,7 +7,8 @@ export {
   toRadians,
   calculateDistance,
   getCoordinates,
-  checkAndRemoveLayers
+  checkAndRemoveLayers,
+  createMarkerElement
 } from './mapCore';
 
 // Re-export location finder functionality

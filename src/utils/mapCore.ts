@@ -62,3 +62,61 @@ export function checkAndRemoveLayers(map: mapboxgl.Map, layerIds: string[], sour
     map.removeSource(sourceId);
   }
 }
+
+// Create a map marker element with Google Maps-like appearance
+export function createMarkerElement(
+  locationType: LocationSourceTarget, 
+  options: {
+    size?: number,
+    primaryColor?: string,
+    secondaryColor?: string,
+    customIconUrl?: string
+  } = {}
+): HTMLDivElement {
+  const {
+    size = locationType === 'property' ? 24 : 32,
+    primaryColor = locationType === 'property' ? '#4285F4' : 
+                   locationType === 'fedex' ? '#FF6600' : '#00704A',
+    secondaryColor = '#FFFFFF',
+    customIconUrl = locationType === 'fedex' ? '/fedex-logo.png' : 
+                   locationType === 'starbucks' ? '/starbucks-logo.png' : undefined
+  } = options;
+  
+  const el = document.createElement('div');
+  el.className = `${locationType}-marker`;
+  
+  // Base Google Maps-like pin style
+  el.style.width = `${size}px`;
+  el.style.height = `${size}px`;
+  el.style.borderRadius = '50% 50% 50% 0';
+  el.style.backgroundColor = primaryColor;
+  el.style.position = 'relative';
+  el.style.transform = 'rotate(-45deg)';
+  el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+  
+  // For property pins, we make them look like standard Google Maps pins
+  if (locationType === 'property') {
+    // No inner content needed for property pins
+  } else {
+    // For FedEx and Starbucks, we add their logos inside a circular area
+    const innerCircle = document.createElement('div');
+    innerCircle.style.position = 'absolute';
+    innerCircle.style.width = `${Math.round(size * 0.75)}px`;
+    innerCircle.style.height = `${Math.round(size * 0.75)}px`;
+    innerCircle.style.backgroundColor = secondaryColor;
+    innerCircle.style.borderRadius = '50%';
+    innerCircle.style.top = '50%';
+    innerCircle.style.left = '50%';
+    innerCircle.style.transform = 'translate(-50%, -50%) rotate(45deg)';
+    
+    if (customIconUrl) {
+      innerCircle.style.backgroundImage = `url('${customIconUrl}')`;
+      innerCircle.style.backgroundSize = 'cover';
+      innerCircle.style.backgroundPosition = 'center';
+    }
+    
+    el.appendChild(innerCircle);
+  }
+  
+  return el;
+}

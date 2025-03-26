@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -11,7 +10,8 @@ import {
   findLocationsWithTripleTypeProximity,
   findLocationsWithComplexSpatialQuery,
   parseComplexSpatialQuery,
-  calculateDistance
+  calculateDistance,
+  createMarkerElement
 } from '@/utils/mapUtils';
 import type { LocationWithCoordinates } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
@@ -169,6 +169,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [visibleLocationTypes, setVisibleLocationTypes] = useState<string[]>([]);
   const [currentQuery, setCurrentQuery] = useState<LocationQuery | null>(null);
   const [preserveProperties, setPreserveProperties] = useState<boolean>(true);
+  const [propertiesLoaded, setPropertiesLoaded] = useState<boolean>(false);
 
   useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
@@ -200,13 +201,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       newMap.on('load', () => {
         console.log("Map loaded successfully");
         
-        newMap.setFog({
+        map.current?.setFog({
           color: 'rgb(255, 255, 255)',
           'high-color': 'rgb(200, 200, 225)',
           'horizon-blend': 0.2,
         });
         
         setMapInitialized(true);
+        
+        setTimeout(() => {
+          if (!propertiesLoaded) {
+            addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#4285F4', '#FFFFFF');
+            setPropertiesLoaded(true);
+            emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+            fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+          }
+        }, 500);
       });
       
       const secondsPerRevolution = 240;
@@ -257,7 +267,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     } catch (error) {
       console.error("Error initializing map:", error);
     }
-  }, [mapInitialized]);
+  }, [mapInitialized, propertiesLoaded]);
 
   useEffect(() => {
     if (!mapInitialized) return;
@@ -269,9 +279,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const query = (e as CustomEvent).detail as LocationQuery;
       setCurrentQuery(query);
       
-      // Only clear non-property markers to preserve property pins
       clearNonPropertyMarkers();
-      clearFilteredLocations(false);
+      
+      if (!preserveProperties) {
+        clearFilteredLocations(false);
+      } else {
+        clearConnections();
+      }
       
       let sourceLocs: LocationWithCoordinates[] = [];
       let targetLocs: LocationWithCoordinates[] = [];
@@ -304,29 +318,19 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         console.log(`Found ${sourceLocations.length} ${query.source} locations within ${query.radius} miles of ${query.target}`);
         
         if (query.source === 'property') {
-          if (preserveProperties) {
-            // Keep existing property markers and add new ones
-            addFilteredLocations(sourceLocations, 'property', '#3B82F6', '#1E40AF', true);
-          } else {
-            addFilteredLocations(sourceLocations, 'property', '#3B82F6', '#1E40AF');
-          }
+          addFilteredLocations(sourceLocations, 'property', '#4285F4', '#FFFFFF', preserveProperties);
         } else if (query.source === 'fedex') {
-          addFilteredLocations(sourceLocations, 'fedex', '#FFFFFF', '#FF6600');
+          addFilteredLocations(sourceLocations, 'fedex', '#FF6600', '#FFFFFF');
         } else if (query.source === 'starbucks') {
-          addFilteredLocations(sourceLocations, 'starbucks', '#00704A', '#ffffff');
+          addFilteredLocations(sourceLocations, 'starbucks', '#00704A', '#FFFFFF');
         }
         
         if (query.target === 'property') {
-          if (preserveProperties) {
-            // Keep existing property markers and add new ones
-            addFilteredLocations(targetLocations, 'property', '#3B82F6', '#1E40AF', true);
-          } else {
-            addFilteredLocations(targetLocations, 'property', '#3B82F6', '#1E40AF');
-          }
+          addFilteredLocations(targetLocations, 'property', '#4285F4', '#FFFFFF', preserveProperties);
         } else if (query.target === 'fedex') {
-          addFilteredLocations(targetLocations, 'fedex', '#FFFFFF', '#FF6600');
+          addFilteredLocations(targetLocations, 'fedex', '#FF6600', '#FFFFFF');
         } else if (query.target === 'starbucks') {
-          addFilteredLocations(targetLocations, 'starbucks', '#00704A', '#ffffff');
+          addFilteredLocations(targetLocations, 'starbucks', '#00704A', '#FFFFFF');
         }
         
         addConnectionLines(connections);
@@ -339,19 +343,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       } else {
         if (query.source === 'property') {
-          if (preserveProperties) {
-            // Keep existing property markers and add new ones
-            addFilteredLocations(sourceLocs, 'property', '#3B82F6', '#1E40AF', true);
-          } else {
-            addFilteredLocations(sourceLocs, 'property', '#3B82F6', '#1E40AF');
-          }
+          addFilteredLocations(sourceLocs, 'property', '#4285F4', '#FFFFFF', preserveProperties);
           fitMapToLocations(sourceLocs.map(loc => loc.coordinates as [number, number]));
           emitResultsUpdate(sourceLocs);
         } else if (query.source === 'fedex') {
-          addFilteredLocations(sourceLocs, 'fedex', '#FFFFFF', '#FF6600');
+          addFilteredLocations(sourceLocs, 'fedex', '#FF6600', '#FFFFFF');
           fitMapToLocations(sourceLocs.map(loc => loc.coordinates as [number, number]));
         } else if (query.source === 'starbucks') {
-          addFilteredLocations(sourceLocs, 'starbucks', '#00704A', '#ffffff');
+          addFilteredLocations(sourceLocs, 'starbucks', '#00704A', '#FFFFFF');
           fitMapToLocations(sourceLocs.map(loc => loc.coordinates as [number, number]));
         }
       }
@@ -367,9 +366,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       setCurrentQuery(query);
-      // Only clear non-property markers to preserve property pins
       clearNonPropertyMarkers();
-      clearFilteredLocations(false);
       
       const { includeType, excludeType, includeRadius, excludeRadius } = query.complexSpatialQuery;
       
@@ -406,7 +403,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       console.log(`Found ${result.resultLocations.length} properties that meet complex spatial criteria`);
       
-      // Add property locations with preservation flag
       addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF', preserveProperties);
       
       const connectedIncludeLocations = new Set<string>();
@@ -453,9 +449,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       setCurrentQuery(query);
-      // Only clear non-property markers to preserve property pins
       clearNonPropertyMarkers();
-      clearFilteredLocations(false);
       
       const { targetTypes } = query.multiTargetQuery;
       
@@ -485,10 +479,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       console.log(`Found ${result.resultProperties.length} properties that meet multi-target proximity criteria`);
       
-      // Always add property locations for multi-target queries
       addFilteredLocations(result.resultProperties, 'property', '#3B82F6', '#1E40AF', preserveProperties);
       
-      // Update displayed properties for results list
       setDisplayedProperties(result.resultProperties);
       
       const connectedTargets = new Map<LocationSourceTarget, Set<string>>();
@@ -507,7 +499,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       });
       
-      // Add connection lines to visualize the relationships
       addConnectionLines(result.connections);
       
       targetDataArray.forEach(targetData => {
@@ -524,7 +515,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           } else if (targetData.type === 'starbucks') {
             addFilteredLocations(connectedLocations, 'starbucks', '#00704A', '#ffffff');
           } else if (targetData.type === 'property') {
-            // Add property locations with preservation flag
             addFilteredLocations(connectedLocations, 'property', '#3B82F6', '#1E40AF', preserveProperties);
           }
         }
@@ -537,10 +527,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       fitMapToLocations(allCoordinates);
       
-      // Emit result update to update the property list
       emitResultsUpdate(result.resultProperties);
       
-      // Update map context to reflect the current query state
       emitMapContextUpdate({
         visibleLocations: ['property', ...targetTypes.map(t => t.type)],
         query,
@@ -558,9 +546,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       setCurrentQuery(query);
-      // Only clear non-property markers to preserve property pins
       clearNonPropertyMarkers();
-      clearFilteredLocations(false);
       
       const { primaryType, targetTypes } = query.dynamicQuery;
       
@@ -611,7 +597,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       );
       
       if (primaryType === 'property') {
-        // Add property locations with preservation flag
         addFilteredLocations(result.resultLocations, 'property', '#3B82F6', '#1E40AF', preserveProperties);
       } else if (primaryType === 'fedex') {
         addFilteredLocations(result.resultLocations, 'fedex', '#FFFFFF', '#FF6600');
@@ -652,7 +637,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           } else if (targetType === 'starbucks') {
             addFilteredLocations(connectedLocations, 'starbucks', '#00704A', '#ffffff');
           } else if (targetType === 'property') {
-            // Add property locations with preservation flag
             addFilteredLocations(connectedLocations, 'property', '#3B82F6', '#1E40AF', preserveProperties);
           }
         }
@@ -696,85 +680,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     return locations;
   };
 
-  const addFedExLocations = () => {
-    if (!map.current) {
-      console.error("Map not initialized when adding FedEx locations");
-      return [];
-    }
+  const clearConnections = () => {
+    if (!map.current) return;
     
-    const locations = loadFedExLocations();
+    console.log("Clearing only connection lines");
     
-    console.log("Adding FedEx locations markers");
-    const markers: mapboxgl.Marker[] = [];
-    
-    locations.forEach(location => {
-      const el = document.createElement('div');
-      el.className = 'fedex-marker';
-      el.style.width = '32px';
-      el.style.height = '32px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = '#FFFFFF';
-      el.style.backgroundImage = "url('/fedex-logo.png')";
-      el.style.backgroundSize = 'cover';
-      el.style.backgroundPosition = 'center';
-      el.style.border = '2px solid #FF6600';
-      
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(location.coordinates as [number, number])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`<h3>${location.name}</h3><p>${location.description}</p>`)
-        )
-        .addTo(map.current);
-      
-      markers.push(marker);
-    });
-    
-    setActiveMarkers(prev => [...prev, ...markers]);
-    return markers;
-  };
-  
-  const addStarbucksLocations = () => {
-    if (!map.current) {
-      console.error("Map not initialized when adding Starbucks locations");
-      return [];
-    }
-    
-    if (!starbucksLoaded) {
-      setStarbucksLoaded(true);
-    }
-    
-    console.log("Adding Starbucks locations markers");
-    const markers: mapboxgl.Marker[] = [];
-    
-    STARBUCKS_LOCATIONS.forEach(location => {
-      const el = document.createElement('div');
-      el.className = 'starbucks-marker';
-      el.style.width = '32px';
-      el.style.height = '32px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = '#FFFFFF';
-      el.style.backgroundImage = "url('/starbucks-logo.png')";
-      el.style.backgroundSize = 'cover';
-      el.style.backgroundPosition = 'center';
-      el.style.border = '2px solid #00704A';
-      
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(location.coordinates as [number, number])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 })
-            .setHTML(`<h3>${location.name}</h3><p>${location.description}</p>`)
-        )
-        .addTo(map.current);
-      
-      markers.push(marker);
-    });
-    
-    setActiveMarkers(prev => [...prev, ...markers]);
-    return markers;
+    checkAndRemoveLayers(map.current, activeLayers, 'connections');
+    checkAndRemoveLayers(map.current, activeLayers, 'exclude-connections');
+    setActiveLayers([]);
   };
 
-  // New function to clear only non-property markers
   const clearNonPropertyMarkers = () => {
     console.log("Clearing only non-property markers");
     
@@ -794,7 +709,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log(`Preserving ${propertyMarkers.length} property markers`);
     setActiveMarkers(propertyMarkers);
     
-    // Update visible location types
     const newVisibleTypes = [...visibleLocationTypes];
     if (newVisibleTypes.includes('fedex')) {
       newVisibleTypes.splice(newVisibleTypes.indexOf('fedex'), 1);
@@ -808,8 +722,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const addFilteredLocations = (
     locations: LocationWithCoordinates[],
     locationType: 'property' | 'fedex' | 'starbucks',
-    backgroundColor: string,
-    borderColor: string,
+    primaryColor: string,
+    secondaryColor: string,
     preserveExisting: boolean = false
   ) => {
     if (!map.current) {
@@ -820,7 +734,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log(`Adding ${locations.length} ${locationType} locations (preserveExisting: ${preserveExisting})`);
     const markers: mapboxgl.Marker[] = [];
     
-    // If preserving existing markers and this is a property, skip locations that are already on the map
     const existingLocationCoords = new Set<string>();
     
     if (preserveExisting && locationType === 'property') {
@@ -843,7 +756,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     locations.forEach(location => {
-      // Skip if this location is already displayed and we're preserving existing markers
       if (preserveExisting && locationType === 'property') {
         const locationCoord = location.coordinates.toString();
         if (existingLocationCoords.has(locationCoord)) {
@@ -852,34 +764,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         }
       }
       
-      const el = document.createElement('div');
-      el.className = `${locationType}-marker`;
-      
-      if (locationType === 'fedex') {
-        el.style.width = '32px';
-        el.style.height = '32px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = '#FFFFFF';
-        el.style.backgroundImage = "url('/fedex-logo.png')";
-        el.style.backgroundSize = 'cover';
-        el.style.backgroundPosition = 'center';
-        el.style.border = '2px solid #FF6600';
-      } else if (locationType === 'starbucks') {
-        el.style.width = '32px';
-        el.style.height = '32px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = '#FFFFFF';
-        el.style.backgroundImage = "url('/starbucks-logo.png')";
-        el.style.backgroundSize = 'cover';
-        el.style.backgroundPosition = 'center';
-        el.style.border = '2px solid #00704A';
-      } else {
-        el.style.width = '24px';
-        el.style.height = '24px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = backgroundColor;
-        el.style.border = `2px solid ${borderColor}`;
-      }
+      const el = createMarkerElement(locationType, {
+        primaryColor,
+        secondaryColor,
+        customIconUrl: locationType === 'fedex' ? '/fedex-logo.png' : 
+                      locationType === 'starbucks' ? '/starbucks-logo.png' : undefined
+      });
       
       const marker = new mapboxgl.Marker(el)
         .setLngLat(location.coordinates as [number, number])
@@ -898,7 +788,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       setDisplayedProperties(locations);
     } else if (locationType === 'property' && preserveExisting) {
       setDisplayedProperties(prev => {
-        // Combine existing and new properties, avoiding duplicates
         const existingIds = new Set(prev.map(p => p.name));
         const newProps = locations.filter(p => !existingIds.has(p.name));
         return [...prev, ...newProps];
