@@ -370,14 +370,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (locationType === 'property') {
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
-        el.style.width = '16px';
-        el.style.height = '24px';
+        el.style.width = '14px';
+        el.style.height = '20px';
         el.style.position = 'relative';
         el.style.cursor = 'pointer';
         
         const pinShape = document.createElement('div');
-        pinShape.style.width = '16px';
-        pinShape.style.height = '16px';
+        pinShape.style.width = '14px';
+        pinShape.style.height = '14px';
         pinShape.style.borderRadius = '50% 50% 50% 0';
         pinShape.style.background = bgColor;
         pinShape.style.transform = 'rotate(-45deg)';
@@ -388,8 +388,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         pinShape.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         
         const pinCenter = document.createElement('div');
-        pinCenter.style.width = '6px';
-        pinCenter.style.height = '6px';
+        pinCenter.style.width = '4px';
+        pinCenter.style.height = '4px';
         pinCenter.style.background = borderColor;
         pinCenter.style.borderRadius = '50%';
         pinCenter.style.position = 'absolute';
@@ -426,7 +426,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -12] : [0, 0],
+        offset: locationType === 'property' ? [0, -10] : [0, 0],
         closeButton: false,
         closeOnClick: true
       }).setHTML(`
@@ -439,8 +439,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: locationType === 'property' ? 'bottom' : 'center',
-        pitchAlignment: 'viewport',
-        rotationAlignment: 'viewport'
+        pitchAlignment: 'map',
+        rotationAlignment: 'map'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
