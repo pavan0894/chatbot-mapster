@@ -651,15 +651,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       )
     );
     
-    // Display the filtered properties
+    // Display the filtered properties ONLY if there are any matching the criteria
     if (filteredProperties.length > 0) {
       addFilteredLocations(filteredProperties, 'property', '#333', '#fff');
+      newVisibleTypes.push('property');
       
       // Fit map to show all relevant markers
       const allLocations = [...includeLocations, ...excludeLocations, ...filteredProperties];
       fitMapToLocations(allLocations.map(loc => loc.coordinates as [number, number]));
       
-      // Emit results update
+      // Emit results update with ONLY the filtered properties
       emitResultsUpdate(filteredProperties);
       emitMapContextUpdate({
         visibleLocations: newVisibleTypes,
