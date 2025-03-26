@@ -172,11 +172,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         }
       } else {
         if (lowerMsg.indexOf('propert') < lowerMsg.indexOf('starbucks')) {
-          source = 'property';
-          target = 'starbucks';
+          source = 'property' as LocationSourceTarget;
+          target = 'starbucks' as LocationSourceTarget;
         } else {
-          source = 'starbucks';
-          target = 'property';
+          source = 'starbucks' as LocationSourceTarget;
+          target = 'property' as LocationSourceTarget;
         }
       }
       
