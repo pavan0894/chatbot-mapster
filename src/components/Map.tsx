@@ -264,9 +264,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log("Setting up map event listeners");
     
-    const handleLocationQuery = (e: CustomEvent<LocationQuery>) => {
+    const handleLocationQuery = (e: CustomEvent) => {
       console.log("Map received location query event:", e.detail);
-      const query = e.detail;
+      const query = e.detail as LocationQuery;
       setCurrentQuery(query);
       
       clearAllMarkers();
@@ -341,9 +341,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     };
     
-    const handleComplexQuery = (e: CustomEvent<LocationQuery>) => {
+    const handleComplexQuery = (e: CustomEvent) => {
       console.log("Map received complex query event:", e.detail);
-      const query = e.detail;
+      const query = e.detail as LocationQuery;
       
       if (!query.complexSpatialQuery) {
         console.error("Received complex query event but no complexSpatialQuery data");
@@ -433,9 +433,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       emitResultsUpdate(result.resultLocations);
     };
     
-    const handleMultiTargetQuery = (e: CustomEvent<LocationQuery>) => {
+    const handleMultiTargetQuery = (e: CustomEvent) => {
       console.log("Map received multi-target query event:", e.detail);
-      const query = e.detail;
+      const query = e.detail as LocationQuery;
       
       if (!query.multiTargetQuery) {
         console.error("Received multi-target query event but no multiTargetQuery data");
@@ -521,9 +521,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       emitResultsUpdate(result.resultProperties);
     };
     
-    const handleDynamicQuery = (e: CustomEvent<LocationQuery>) => {
+    const handleDynamicQuery = (e: CustomEvent) => {
       console.log("Map received dynamic query event:", e.detail);
-      const query = e.detail;
+      const query = e.detail as LocationQuery;
       
       if (!query.dynamicQuery) {
         console.error("Received dynamic query event but no dynamicQuery data");
