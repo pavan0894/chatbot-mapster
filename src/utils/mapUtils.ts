@@ -1,3 +1,4 @@
+
 // Convert degrees to radians
 function toRadians(degrees: number): number {
   return degrees * Math.PI / 180;
@@ -596,6 +597,176 @@ function normalizeLocationType(type: string): LocationSourceTarget | null {
     return 'starbucks';
   } else if (type.includes('propert') || type.includes('warehouse') || type.includes('industrial')) {
     return 'property';
+  }
+  
+  return null;
+}
+
+// New function for dynamic triple-type location query
+export function findLocationsWithTripleTypeProximity(
+  primaryLocations: LocationWithCoordinates[],
+  targetTypesData: {
+    [key in LocationSourceTarget]?: {
+      locations: LocationWithCoordinates[];
+      radius: number;
+    };
+  }
+): {
+  resultLocations: LocationWithCoordinates[];
+  connections: Array<{
+    source: [number, number];
+    target: [number, number];
+    targetType: LocationSourceTarget;
+    distance: number;
+  }>;
+} {
+  let resultLocations: LocationWithCoordinates[] = [...primaryLocations];
+  const connections: Array<{
+    source: [number, number];
+    target: [number, number];
+    targetType: LocationSourceTarget;
+    distance: number;
+  }> = [];
+
+  console.log(`Starting with ${resultLocations.length} total locations`);
+
+  // Process each target type to filter the results
+  Object.entries(targetTypesData).forEach(([targetTypeStr, data]) => {
+    const targetType = targetTypeStr as LocationSourceTarget;
+    const { locations, radius } = data;
+
+    if (!locations || locations.length === 0) {
+      console.log(`No ${targetType} locations provided, skipping this filter`);
+      return;
+    }
+
+    console.log(`Filtering for ${targetType} within ${radius} miles (${locations.length} locations)`);
+
+    // For each remaining location, check if it's within radius of at least one target
+    const matchingLocations: LocationWithCoordinates[] = [];
+    const typeConnections: Array<{
+      source: [number, number];
+      target: [number, number];
+      targetType: LocationSourceTarget;
+      distance: number;
+    }> = [];
+
+    resultLocations.forEach(location => {
+      const locationCoords = getCoordinates(location);
+      let isWithinRadius = false;
+      let closestDistance = Number.MAX_VALUE;
+      let closestTargetLocation: [number, number] | null = null;
+
+      // Check proximity to each target location
+      for (const targetLocation of locations) {
+        const targetCoords = getCoordinates(targetLocation);
+        const distance = calculateDistance(
+          locationCoords[0],
+          locationCoords[1],
+          targetCoords[0],
+          targetCoords[1]
+        );
+
+        if (distance <= radius) {
+          isWithinRadius = true;
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestTargetLocation = targetCoords;
+          }
+        }
+      }
+
+      // If this location is within radius of at least one target, add it
+      if (isWithinRadius && closestTargetLocation) {
+        matchingLocations.push(location);
+        
+        typeConnections.push({
+          source: locationCoords,
+          target: closestTargetLocation,
+          targetType,
+          distance: closestDistance
+        });
+      }
+    });
+
+    // Update filtered locations
+    resultLocations = matchingLocations;
+    connections.push(...typeConnections);
+
+    console.log(`After filtering for ${targetType}: ${resultLocations.length} locations remain`);
+  });
+
+  return {
+    resultLocations,
+    connections
+  };
+}
+
+// NEW: Function to parse queries with any combination of location types
+export function parseAnyMultiLocationQuery(query: string): {
+  primaryType: LocationSourceTarget;
+  targetTypes: {
+    [key in LocationSourceTarget]?: {
+      radius: number;
+    };
+  };
+} | null {
+  const queryLower = query.toLowerCase();
+  
+  // Determine the primary search type
+  let primaryType: LocationSourceTarget = 'property';
+  
+  // Check what the query is asking for
+  if (queryLower.match(/\b(show|find|locate|display|get|list)\b.*\b(propert|warehouse|industrial)\b/i)) {
+    primaryType = 'property';
+  } else if (queryLower.match(/\b(show|find|locate|display|get|list)\b.*\b(fedex|fed\s*ex|shipping)\b/i)) {
+    primaryType = 'fedex';
+  } else if (queryLower.match(/\b(show|find|locate|display|get|list)\b.*\b(starbucks|coffee|cafe)\b/i)) {
+    primaryType = 'starbucks';
+  } else {
+    // If no clear primary type, default to property
+    primaryType = 'property';
+  }
+  
+  const targetTypes: {
+    [key in LocationSourceTarget]?: {
+      radius: number;
+    };
+  } = {};
+  
+  // Check for references to each location type and extract radii
+  const locationTypes: LocationSourceTarget[] = ['property', 'fedex', 'starbucks'];
+  
+  // Only look for proximity to other types, not the primary type itself
+  locationTypes.filter(type => type !== primaryType).forEach(locationType => {
+    // Check if this location type is mentioned in the query
+    const typePatterns = locationType === 'fedex' 
+      ? [/\bfedex\b/i, /\bfed\s*ex\b/i, /\bshipping\b/i]
+      : locationType === 'starbucks'
+      ? [/\bstarbucks\b/i, /\bcoffee\b/i, /\bcafe\b/i]
+      : [/\bpropert(?:y|ies)\b/i, /\bwarehouse(?:s)?\b/i, /\bindustrial\b/i];
+    
+    const isTypeInQuery = typePatterns.some(pattern => pattern.test(queryLower));
+    
+    if (isTypeInQuery) {
+      // Extract radius for this type
+      const radius = extractRadiusForType(queryLower, locationType);
+      
+      if (radius > 0 || queryLower.match(new RegExp(`\\bnear\\b.*\\b${locationType}\\b`, 'i'))) {
+        targetTypes[locationType] = {
+          radius: radius > 0 ? radius : 5 // Default to 5 miles if no specific radius
+        };
+      }
+    }
+  });
+  
+  // If we found at least one target type, return the query
+  if (Object.keys(targetTypes).length > 0) {
+    return {
+      primaryType,
+      targetTypes
+    };
   }
   
   return null;

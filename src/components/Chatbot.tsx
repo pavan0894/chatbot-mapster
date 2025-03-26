@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
 import ChatMessage, { MessageType } from './ChatMessage';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
-import { parseComplexSpatialQuery, parseMultiTargetQuery } from '@/utils/mapUtils';
+import { parseComplexSpatialQuery, parseMultiTargetQuery, parseAnyMultiLocationQuery } from '@/utils/mapUtils';
 import { setupDebugEventListener, verifyEventCreation } from '@/utils/debugUtils';
 
 export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
@@ -31,12 +31,20 @@ export interface LocationQuery {
       radius: number;
     }[];
   };
+  dynamicQuery?: {
+    targetTypes: {
+      [key in LocationSourceTarget]?: {
+        radius: number;
+      };
+    };
+  };
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
 export const API_QUERY_EVENT = 'api-query-event';
 export const COMPLEX_QUERY_EVENT = 'complex-query-event';
 export const MULTI_TARGET_QUERY_EVENT = 'multi-target-query-event';
+export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
 
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
@@ -62,6 +70,12 @@ export function emitMultiTargetQueryEvent(query: LocationQuery) {
   window.dispatchEvent(event);
 }
 
+export function emitDynamicQueryEvent(query: LocationQuery) {
+  console.log("Emitting dynamic query event:", query);
+  const event = new CustomEvent(DYNAMIC_QUERY_EVENT, { detail: query });
+  window.dispatchEvent(event);
+}
+
 export function emitApiQueryEvent(query: string) {
   console.log("Emitting API query event:", query);
   const event = new CustomEvent(API_QUERY_EVENT, { detail: { query } });
@@ -70,6 +84,20 @@ export function emitApiQueryEvent(query: string) {
 
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
+  
+  const anyMultiLocationQuery = parseAnyMultiLocationQuery(message);
+  if (anyMultiLocationQuery) {
+    console.log("Detected flexible multi-location query:", anyMultiLocationQuery);
+    return {
+      source: anyMultiLocationQuery.primaryType,
+      radius: 5, // Default radius
+      isDallasQuery: message.includes('dallas') || message.includes('dfw'),
+      queryText: message,
+      dynamicQuery: {
+        targetTypes: anyMultiLocationQuery.targetTypes
+      }
+    };
+  }
   
   const multiTargetQuery = parseMultiTargetQuery(message);
   if (multiTargetQuery) {
@@ -474,6 +502,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setupDebugEventListener(COMPLEX_QUERY_EVENT);
     setupDebugEventListener(API_QUERY_EVENT);
     setupDebugEventListener(MULTI_TARGET_QUERY_EVENT);
+    setupDebugEventListener(DYNAMIC_QUERY_EVENT);
     
     setTimeout(() => {
       const event = verifyEventCreation('chatbot-loaded', { status: 'ready' });
@@ -606,6 +635,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
           emitMultiTargetQueryEvent(locationQuery);
         } else if (locationQuery.complexQuery) {
           emitComplexQueryEvent(locationQuery);
+        } else if (locationQuery.dynamicQuery) {
+          emitDynamicQueryEvent(locationQuery);
         } else {
           const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
             detail: locationQuery,
