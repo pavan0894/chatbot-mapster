@@ -75,7 +75,7 @@ const FEDEX_LOCATIONS: LocationWithCoordinates[] = [
 export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
 
 export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
-  console.log("Emitting map results update with properties:", properties.length);
+  console.log("Emitting map results update with properties:", properties);
   const event = new CustomEvent(MAP_RESULTS_UPDATE_EVENT, { 
     detail: { properties } 
   });
@@ -276,7 +276,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
     const query = event.detail;
-    console.log("Location query received:", query);
+    console.log("Location query received in Map component:", query);
     
     if (!map.current) {
       console.error("Map not initialized when handling location query");
@@ -301,11 +301,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (query.source === 'fedex') {
         addFedExLocations();
         fitMapToLocations(FEDEX_LOCATIONS.map(loc => loc.coordinates as [number, number]));
+        console.log("Emitting FedEx locations:", FEDEX_LOCATIONS.length);
         emitResultsUpdate(FEDEX_LOCATIONS);
         return;
       } else if (query.source === 'property') {
         addIndustrialProperties();
         fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+        console.log("Emitting Industrial properties:", INDUSTRIAL_PROPERTIES.length);
         emitResultsUpdate(INDUSTRIAL_PROPERTIES);
         return;
       }
@@ -323,6 +325,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       console.log("No locations found within the radius");
       addIndustrialProperties();
       addFedExLocations();
+      emitResultsUpdate([]);
       return;
     }
     
@@ -346,9 +349,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }));
     
     if (query.source === 'property') {
+      console.log("Emitting source locations (properties):", sourceLocations.length);
       emitResultsUpdate(sourceLocations);
     } else if (query.target === 'property') {
+      console.log("Emitting target locations (properties):", targetLocations.length);
       emitResultsUpdate(targetLocations);
+    } else {
+      console.log("Default case: emitting all industrial properties");
+      emitResultsUpdate(INDUSTRIAL_PROPERTIES);
     }
   };
 
@@ -559,6 +567,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     addIndustrialProperties();
     addFedExLocations();
     
+    console.log("Reset map: emitting all industrial properties");
     emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -148,7 +149,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
 
     // Check if the message is a location query
     const locationQuery = isLocationQuery(input);
-    console.log("Location query detected:", locationQuery);
+    console.log("Location query detected in Chatbot:", locationQuery);
 
     // Create a temporary processing message
     const processingMessage: MessageType = {
@@ -161,7 +162,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages(prevMessages => [...prevMessages, processingMessage]);
 
     if (locationQuery) {
-      // Emit the location query event
+      // Explicitly emit the location query event
       emitLocationQuery(locationQuery);
       
       // Convert messages to format expected by AI service
