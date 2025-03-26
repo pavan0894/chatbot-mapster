@@ -49,28 +49,31 @@ const INDUSTRIAL_PROPERTIES: LocationWithCoordinates[] = [
   { name: "Hutchins Logistics Center", coordinates: [-96.7112, 32.6421], description: "Cold storage distribution" }
 ];
 
-const FEDEX_LOCATIONS: LocationWithCoordinates[] = [
-  { name: "FedEx Ship Center - Downtown", coordinates: [-96.8066, 32.7791], description: "Shipping & pickup services" },
-  { name: "FedEx Office - Uptown", coordinates: [-96.8031, 32.7956], description: "Printing & shipping services" },
-  { name: "FedEx Ground - North Dallas", coordinates: [-96.7351, 32.9119], description: "Package delivery hub" },
-  { name: "FedEx Express - Addison", coordinates: [-96.8387, 32.9534], description: "Express shipping center" },
-  { name: "FedEx Freight - South Dallas", coordinates: [-96.7865, 32.6953], description: "Freight shipping terminal" },
-  { name: "FedEx Office - Richardson", coordinates: [-96.7519, 32.9312], description: "Business services" },
-  { name: "FedEx Ship Center - Irving", coordinates: [-96.9513, 32.8379], description: "Shipping & pickup services" },
-  { name: "FedEx Ground - Garland", coordinates: [-96.6513, 32.9018], description: "Package sorting facility" },
-  { name: "FedEx Office - Plano", coordinates: [-96.7716, 33.0176], description: "Printing & shipping services" },
-  { name: "FedEx Express - Mesquite", coordinates: [-96.6102, 32.7651], description: "Express shipping center" },
-  { name: "FedEx Ship Center - Lewisville", coordinates: [-96.9945, 33.0317], description: "Shipping & pickup services" },
-  { name: "FedEx Freight - Arlington", coordinates: [-97.0678, 32.7231], description: "Freight shipping terminal" },
-  { name: "FedEx Office - Las Colinas", coordinates: [-96.9419, 32.8632], description: "Business services" },
-  { name: "FedEx Ground - Carrollton", coordinates: [-96.9001, 32.9846], description: "Package delivery hub" },
-  { name: "FedEx Express - Grand Prairie", coordinates: [-97.0213, 32.7596], description: "Express shipping center" },
-  { name: "FedEx Office - Frisco", coordinates: [-96.8239, 33.0945], description: "Printing & shipping services" },
-  { name: "FedEx Ship Center - McKinney", coordinates: [-96.6392, 33.1971], description: "Shipping & pickup services" },
-  { name: "FedEx Office - Grapevine", coordinates: [-97.0789, 32.9342], description: "Business services" },
-  { name: "FedEx Ground - Denton", coordinates: [-97.1306, 33.2148], description: "Package sorting facility" },
-  { name: "FedEx Express - Rockwall", coordinates: [-96.4597, 32.9290], description: "Express shipping center" }
-];
+function getFedExLocations(): LocationWithCoordinates[] {
+  console.log("Dynamically loading FedEx locations");
+  return [
+    { name: "FedEx Ship Center - Downtown", coordinates: [-96.8066, 32.7791], description: "Shipping & pickup services" },
+    { name: "FedEx Office - Uptown", coordinates: [-96.8031, 32.7956], description: "Printing & shipping services" },
+    { name: "FedEx Ground - North Dallas", coordinates: [-96.7351, 32.9119], description: "Package delivery hub" },
+    { name: "FedEx Express - Addison", coordinates: [-96.8387, 32.9534], description: "Express shipping center" },
+    { name: "FedEx Freight - South Dallas", coordinates: [-96.7865, 32.6953], description: "Freight shipping terminal" },
+    { name: "FedEx Office - Richardson", coordinates: [-96.7519, 32.9312], description: "Business services" },
+    { name: "FedEx Ship Center - Irving", coordinates: [-96.9513, 32.8379], description: "Shipping & pickup services" },
+    { name: "FedEx Ground - Garland", coordinates: [-96.6513, 32.9018], description: "Package sorting facility" },
+    { name: "FedEx Office - Plano", coordinates: [-96.7716, 33.0176], description: "Printing & shipping services" },
+    { name: "FedEx Express - Mesquite", coordinates: [-96.6102, 32.7651], description: "Express shipping center" },
+    { name: "FedEx Ship Center - Lewisville", coordinates: [-96.9945, 33.0317], description: "Shipping & pickup services" },
+    { name: "FedEx Freight - Arlington", coordinates: [-97.0678, 32.7231], description: "Freight shipping terminal" },
+    { name: "FedEx Office - Las Colinas", coordinates: [-96.9419, 32.8632], description: "Business services" },
+    { name: "FedEx Ground - Carrollton", coordinates: [-96.9001, 32.9846], description: "Package delivery hub" },
+    { name: "FedEx Express - Grand Prairie", coordinates: [-97.0213, 32.7596], description: "Express shipping center" },
+    { name: "FedEx Office - Frisco", coordinates: [-96.8239, 33.0945], description: "Printing & shipping services" },
+    { name: "FedEx Ship Center - McKinney", coordinates: [-96.6392, 33.1971], description: "Shipping & pickup services" },
+    { name: "FedEx Office - Grapevine", coordinates: [-97.0789, 32.9342], description: "Business services" },
+    { name: "FedEx Ground - Denton", coordinates: [-97.1306, 33.2148], description: "Package sorting facility" },
+    { name: "FedEx Express - Rockwall", coordinates: [-96.4597, 32.9290], description: "Express shipping center" }
+  ];
+}
 
 export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
 
@@ -92,7 +95,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const [mapInitialized, setMapInitialized] = useState<boolean>(false);
   const [activeMarkers, setActiveMarkers] = useState<mapboxgl.Marker[]>([]);
   const [activeLayers, setActiveLayers] = useState<string[]>([]);
-  const [hasUserQuery, setHasUserQuery] = useState<boolean>(false);
+  const [fedExLocations, setFedExLocations] = useState<LocationWithCoordinates[]>([]);
+  const [fedExLoaded, setFedExLoaded] = useState<boolean>(false);
 
   useEffect(() => {
     if (!mapContainer.current || mapInitialized) return;
@@ -131,10 +135,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         });
         
         // Only add industrial properties on initial load
-        // FedEx locations will only be added when specifically requested
-        if (!hasUserQuery) {
-          addIndustrialProperties();
-        }
+        addIndustrialProperties();
         
         setMapInitialized(true);
       });
@@ -187,7 +188,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     } catch (error) {
       console.error("Error initializing map:", error);
     }
-  }, [mapInitialized, hasUserQuery]);
+  }, [mapInitialized]);
 
   const addIndustrialProperties = () => {
     if (!map.current) {
@@ -227,16 +228,31 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     emitResultsUpdate(INDUSTRIAL_PROPERTIES);
   };
 
+  const loadFedExLocations = () => {
+    if (fedExLoaded) {
+      console.log("FedEx locations already loaded");
+      return fedExLocations;
+    }
+    
+    console.log("Loading FedEx locations dynamically");
+    const locations = getFedExLocations();
+    setFedExLocations(locations);
+    setFedExLoaded(true);
+    return locations;
+  };
+
   const addFedExLocations = () => {
     if (!map.current) {
       console.error("Map not initialized when adding FedEx locations");
       return;
     }
     
+    const locations = loadFedExLocations();
+    
     console.log("Adding FedEx locations markers");
     const markers: mapboxgl.Marker[] = [];
     
-    FEDEX_LOCATIONS.forEach(location => {
+    locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
       el.style.width = '28px';
@@ -276,6 +292,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     });
     
     setActiveMarkers(prev => [...prev, ...markers]);
+    return locations;
   };
 
   const handleLocationQuery = (event: CustomEvent<LocationQuery>) => {
@@ -287,79 +304,75 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // Set flag that user has made a query - we'll use this to not display all pins automatically
-    setHasUserQuery(true);
-    
-    // Clear existing markers and layers
     clearFilteredLocations();
     clearAllMarkers();
     
-    // Only add FedEx locations if explicitly mentioned in the query
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
     let sourceData: LocationWithCoordinates[];
-    let targetData: LocationWithCoordinates[];
+    let targetData: LocationWithCoordinates[] | null = null;
     
     if (query.source === 'fedex') {
-      sourceData = FEDEX_LOCATIONS;
-      targetData = query.target === 'property' ? INDUSTRIAL_PROPERTIES : INDUSTRIAL_PROPERTIES;
+      sourceData = loadFedExLocations();
+      if (query.target === 'property') {
+        targetData = INDUSTRIAL_PROPERTIES;
+      }
     } else {
       sourceData = INDUSTRIAL_PROPERTIES;
-      targetData = query.target === 'fedex' ? FEDEX_LOCATIONS : FEDEX_LOCATIONS;
+      if (query.target === 'fedex') {
+        targetData = loadFedExLocations();
+      }
     }
     
-    // Handle showing all locations of one type
     if (!query.target) {
       if (query.source === 'fedex') {
-        // Only show FedEx pins when explicitly requested
-        addFilteredLocations(FEDEX_LOCATIONS, 'fedex', '#4D148C', '#FF6600');
-        fitMapToLocations(FEDEX_LOCATIONS.map(loc => loc.coordinates as [number, number]));
-        console.log("Showing FedEx locations:", FEDEX_LOCATIONS.length);
+        const fedExLocations = addFedExLocations();
+        fitMapToLocations(fedExLocations.map(loc => loc.coordinates as [number, number]));
+        emitResultsUpdate(fedExLocations);
+        console.log("Showing FedEx locations:", fedExLocations.length);
         return;
       } else if (query.source === 'property') {
         addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
         fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
+        emitResultsUpdate(INDUSTRIAL_PROPERTIES);
         console.log("Showing Industrial properties:", INDUSTRIAL_PROPERTIES.length);
         return;
       }
     }
     
-    // Find locations within the specified radius
-    const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
-      sourceData,
-      targetData,
-      query.radius
-    );
-    
-    console.log("Found connections:", connections.length);
-    
-    if (connections.length === 0) {
-      console.log("No locations found within the radius");
-      return;
-    }
-    
-    // Only add the filtered source locations to the map
-    addFilteredLocations(sourceLocations, query.source, 
-      query.source === 'fedex' ? '#4D148C' : '#333', 
-      query.source === 'fedex' ? '#FF6600' : '#fff');
-    
-    // Only add the filtered target locations if specified
-    if (query.target) {
+    if (targetData) {
+      const { sourceLocations, targetLocations, connections } = findLocationsWithinRadius(
+        sourceData,
+        targetData,
+        query.radius
+      );
+      
+      console.log("Found connections:", connections.length);
+      
+      if (connections.length === 0) {
+        console.log("No locations found within the radius");
+        return;
+      }
+      
+      addFilteredLocations(sourceLocations, query.source, 
+        query.source === 'fedex' ? '#4D148C' : '#333', 
+        query.source === 'fedex' ? '#FF6600' : '#fff');
+      
       addFilteredLocations(targetLocations, query.target, 
         query.target === 'fedex' ? '#4D148C' : '#333', 
         query.target === 'fedex' ? '#FF6600' : '#fff');
+      
+      addConnectionLines(connections);
+      
+      fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
+        const coords = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
+          ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
+          : [0, 0] as [number, number];
+        return coords;
+      }));
+      
+      emitResultsUpdate([...sourceLocations, ...targetLocations]);
     }
-    
-    // Add connection lines between matched locations
-    addConnectionLines(connections);
-    
-    // Fit map view to show all displayed locations
-    fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
-      const coords = Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
-        ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
-        : [0, 0] as [number, number];
-      return coords;
-    }));
   };
 
   const addFilteredLocations = (
@@ -559,9 +572,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearFilteredLocations();
     clearAllMarkers();
     
-    // Reset user query flag
-    setHasUserQuery(false);
-    
     map.current.flyTo({
       center: [-96.7970, 32.7767],
       zoom: 9,
@@ -569,7 +579,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       bearing: 0
     });
     
-    // Show only industrial properties on reset, not FedEx locations
     addIndustrialProperties();
   };
 
@@ -577,13 +586,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log("Setting up event listener for location queries");
     
     const handleLocationQueryTyped = (e: Event) => {
-      // Ensure the event is properly handled and casted
       const customEvent = e as CustomEvent<LocationQuery>;
       console.log("Received location query event:", customEvent.detail);
       handleLocationQuery(customEvent);
     };
     
-    // Make sure we're actually listening to the event
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
     
     return () => {

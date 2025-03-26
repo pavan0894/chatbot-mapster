@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -29,54 +30,47 @@ export function emitLocationQuery(query: LocationQuery) {
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
   
-  // Check for fedex and property mentions
-  const hasFedEx = message.includes('fedex');
-  const hasProperty = message.includes('property') || message.includes('industrial') || message.includes('warehouse');
+  // Check for FedEx-related queries specifically
+  const fedExKeywords = [
+    'fedex', 'fed ex', 'federal express', 'shipping center', 
+    'shipping location', 'shipping service', 'delivery service'
+  ];
   
-  // If no location types are mentioned but asking about fedex, return fedex source
-  if (hasFedEx && !hasProperty) {
-    // Determine radius (default to 5 miles)
-    let radius = 5;
-    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
-    if (radiusMatch) {
-      radius = parseInt(radiusMatch[1], 10);
-    }
-    
+  const hasFedEx = fedExKeywords.some(keyword => message.includes(keyword));
+  
+  const propertyKeywords = [
+    'property', 'properties', 'industrial', 'warehouse', 
+    'warehouses', 'logistics', 'distribution'
+  ];
+  
+  const hasProperty = propertyKeywords.some(keyword => message.includes(keyword));
+  
+  // Determine radius (default to 5 miles)
+  let radius = 5;
+  const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
+  if (radiusMatch) {
+    radius = parseInt(radiusMatch[1], 10);
+  }
+  
+  // Check for specific requests to see all FedEx locations
+  const showAllFedEx = message.match(/show\s+(?:all\s+)?fedex/i) || 
+                       message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i) ||
+                       message.match(/fedex\s+locations/i) ||
+                       message.match(/find\s+fedex/i) ||
+                       message.match(/locate\s+fedex/i);
+  
+  if (showAllFedEx || (hasFedEx && !hasProperty)) {
     return { source: 'fedex' as LocationSourceTarget, radius };
   }
   
   // If no FedEx mentioned but properties are, return property source
   if (!hasFedEx && hasProperty) {
-    // Determine radius (default to 5 miles)
-    let radius = 5;
-    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
-    if (radiusMatch) {
-      radius = parseInt(radiusMatch[1], 10);
-    }
-    
     return { source: 'property' as LocationSourceTarget, radius };
   }
   
   // If both are mentioned, determine relationship
   if (hasFedEx && hasProperty) {
-    // Determine radius (default to 5 miles)
-    let radius = 5;
-    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
-    if (radiusMatch) {
-      radius = parseInt(radiusMatch[1], 10);
-    }
-    
-    // Simple queries for showing all locations of a type
-    if (message.match(/show\s+(?:all\s+)?fedex/i) || message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i)) {
-      return { source: 'fedex' as LocationSourceTarget, radius };
-    }
-    
-    if (message.match(/show\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i) || 
-        message.match(/where\s+(?:are|is)\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i)) {
-      return { source: 'property' as LocationSourceTarget, radius };
-    }
-    
-    // Determine if FedEx is the source or target
+    // Check for specific relationship patterns
     if ((message.includes('fedex near') || message.includes('fedex close to') || 
         message.includes('fedex within') || message.includes('fedex around')) && hasProperty) {
       return {
@@ -161,12 +155,25 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     console.log("Location query detected in Chatbot:", locationQuery);
 
     // Create a temporary processing message
-    const processingMessage: MessageType = {
-      id: `processing-${msgId}`,
-      text: locationQuery ? "Searching for locations..." : "Processing your request...",
-      sender: 'bot',
-      timestamp: new Date()
-    };
+    let processingMessage: MessageType;
+    
+    if (locationQuery) {
+      processingMessage = {
+        id: `processing-${msgId}`,
+        text: locationQuery.source === 'fedex' ? 
+          "Searching for FedEx locations..." : 
+          "Searching for industrial properties...",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+    } else {
+      processingMessage = {
+        id: `processing-${msgId}`,
+        text: "Processing your request...",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+    }
     
     setMessages(prevMessages => [...prevMessages, processingMessage]);
 
