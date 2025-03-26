@@ -97,6 +97,11 @@ export function findLocationsWithinRadius(
     }
   });
   
+  // If no connections found, return empty arrays to show no markers
+  if (connections.length === 0) {
+    console.log("No connections found within the specified radius");
+  }
+  
   return {
     sourceLocations: validSourceLocations,
     targetLocations: validTargetLocations,
@@ -117,4 +122,12 @@ export function checkAndRemoveLayers(map: mapboxgl.Map, layerIds: string[], sour
   if (map.getSource(sourceId)) {
     map.removeSource(sourceId);
   }
+}
+
+// Helper function to get formatted coordinates from location
+export function getCoordinates(location: LocationWithCoordinates): [number, number] {
+  if (Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
+    return [location.coordinates[0], location.coordinates[1]];
+  }
+  return [0, 0]; // Default if invalid
 }
