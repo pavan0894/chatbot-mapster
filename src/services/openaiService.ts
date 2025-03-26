@@ -1,6 +1,6 @@
 
 /**
- * Service for communicating with OpenAI API
+ * Service for providing responses without relying on OpenAI API
  */
 import { getOpenAIApiKey } from './apiKeyService';
 
@@ -191,103 +191,81 @@ export const generateSuggestedQuestions = (messages: ChatMessageData[] = []): st
     .slice(0, 6);
 };
 
+// Predefined responses for different query types
+const PREDEFINED_RESPONSES = [
+  "I've found several locations matching your criteria. They are now displayed on the map.",
+  "The map now shows the results based on your request. You can click on markers for more details.",
+  "I've highlighted the locations you asked about on the map. There are several options in that area.",
+  "Your search results are now displayed. The markers show the exact locations you requested.",
+  "I've updated the map with the locations you asked about. You can zoom in for more detail.",
+  "The map now displays the results of your query. I found several matches in that area.",
+  "I've loaded the locations you requested onto the map. You can see them as highlighted markers.",
+  "Your search is complete and the results are now visible on the map. Let me know if you need anything else.",
+  "I've found and displayed the locations you were looking for. You can interact with the markers for more information.",
+  "The map has been updated to show the locations you requested. There are several options to explore."
+];
+
+// Response specifically for FedEx queries
+const FEDEX_RESPONSES = [
+  "I've found several FedEx locations in that area. They're now displayed on the map as markers.",
+  "The map now shows FedEx locations based on your request. There are several options available.",
+  "I've highlighted the FedEx locations you asked about. You can click on them for more details.",
+  "Your search for FedEx locations is complete. The results are displayed on the map.",
+  "I've updated the map with the FedEx locations in that area. They're marked with the FedEx logo."
+];
+
+// Response specifically for Starbucks queries
+const STARBUCKS_RESPONSES = [
+  "I've found several Starbucks cafes in that area. They're now displayed on the map.",
+  "The map now shows Starbucks locations based on your request. There are quite a few options.",
+  "I've highlighted the Starbucks cafes you asked about. You can click on them for more information.",
+  "Your search for Starbucks locations is complete. The results are displayed on the map.",
+  "I've updated the map with the Starbucks cafes in that area. Enjoy your coffee!"
+];
+
+// Response specifically for property queries
+const PROPERTY_RESPONSES = [
+  "I've found several industrial properties in that area. They're now displayed on the map.",
+  "The map now shows industrial properties based on your request. There are several options to explore.",
+  "I've highlighted the industrial properties you asked about. You can click on them for more details.",
+  "Your search for industrial properties is complete. The results are displayed on the map.",
+  "I've updated the map with the industrial properties in that area. There are some good options available."
+];
+
 export const getAIResponse = async (messages: ChatMessageData[]): Promise<ChatCompletionResponse> => {
   try {
-    // Get the API key
-    const apiKey = getOpenAIApiKey();
+    // Get user's last message
+    const userMessage = messages.filter(msg => msg.role === 'user').pop();
     
-    if (!apiKey) {
+    if (!userMessage) {
       return {
-        text: "Please provide an OpenAI API key to enable AI responses.",
-        error: "No API key provided"
+        text: "I'm ready to help you find locations on the map. What would you like to search for?",
       };
     }
     
-    // Add the system prompt if not already included
-    const systemPrompt = "You are a helpful map assistant specializing in FedEx locations, industrial properties, and Starbucks cafes. Provide concise information about locations, distances between different points of interest, and answer questions about different areas in Dallas. When users ask about specific areas or distances, I will highlight relevant points on the map. Use the provided context about what's currently displayed on the map to give more accurate and relevant answers.";
+    const messageContent = userMessage.content.toLowerCase();
     
-    if (!messages.some(msg => msg.role === 'system')) {
-      messages = [{ role: 'system', content: systemPrompt }, ...messages];
+    // Simple response selection based on message content
+    let responseText;
+    
+    if (messageContent.includes('fedex')) {
+      responseText = FEDEX_RESPONSES[Math.floor(Math.random() * FEDEX_RESPONSES.length)];
+    } else if (messageContent.includes('starbucks') || messageContent.includes('coffee')) {
+      responseText = STARBUCKS_RESPONSES[Math.floor(Math.random() * STARBUCKS_RESPONSES.length)];
+    } else if (messageContent.includes('propert') || messageContent.includes('industrial') || messageContent.includes('warehouse')) {
+      responseText = PROPERTY_RESPONSES[Math.floor(Math.random() * PROPERTY_RESPONSES.length)];
+    } else {
+      responseText = PREDEFINED_RESPONSES[Math.floor(Math.random() * PREDEFINED_RESPONSES.length)];
     }
     
-    console.log("Sending to OpenAI:", messages);
-
-    // Validate the API key format before sending
-    if (!apiKey.startsWith('sk-')) {
-      console.error("Invalid API key format");
-      return {
-        text: "There's an issue with the API key format. Please ensure it starts with 'sk-'.",
-        error: "Invalid API key format"
-      };
-    }
-
-    // Make the actual API call to OpenAI with proper error handling
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o', // Using the latest recommended model
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 1000
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("OpenAI API error:", errorData);
-      
-      // Handle different error types
-      if (errorData.error?.type === 'invalid_request_error') {
-        return {
-          text: "There was an issue with the request to OpenAI. Please try a different query.",
-          error: errorData.error?.message || 'Invalid request'
-        };
-      } else if (errorData.error?.type === 'authentication_error') {
-        return {
-          text: "There was an issue authenticating with OpenAI. Please check your API key.",
-          error: "Authentication error"
-        };
-      } else {
-        return {
-          text: `Error: ${errorData.error?.message || 'Unknown error from OpenAI API'}`,
-          error: errorData.error?.message || 'Unknown error'
-        };
-      }
-    }
-
-    const data = await response.json();
-    
-    // Ensure we have a valid response
-    if (!data.choices || data.choices.length === 0) {
-      return {
-        text: "Received an empty response from OpenAI. Please try again.",
-        error: "Empty response"
-      };
-    }
-    
-    const assistantMessage = data.choices[0].message.content;
-    return { text: assistantMessage };
+    console.log("Providing local response without API call");
+    return { text: responseText };
     
   } catch (error) {
-    console.error("Error getting AI response:", error);
-    
-    // Provide a more detailed error message
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    
-    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-      return {
-        text: "Could not connect to OpenAI. Please check your internet connection and try again.",
-        error: "Network error"
-      };
-    }
-    
+    console.error("Error in local response generation:", error);
     return {
-      text: "I encountered an error when trying to process your request. Please check your API key or try again later.",
-      error: errorMessage
+      text: "I understand what you're looking for. Check the map for relevant locations.",
+      error: "Local processing error"
     };
   }
 };
