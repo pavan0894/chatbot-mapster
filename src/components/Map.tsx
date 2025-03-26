@@ -257,13 +257,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
-      // Create a container with FedEx branding
       el.style.position = 'relative';
-      el.style.width = '90px'; // Increased width to accommodate full text
+      el.style.width = '90px';
       el.style.height = '35px';
       el.style.cursor = 'pointer';
       
-      // Create the circular part of the marker
       const circle = document.createElement('div');
       circle.style.position = 'absolute';
       circle.style.left = '0';
@@ -271,11 +269,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       circle.style.width = '28px';
       circle.style.height = '28px';
       circle.style.borderRadius = '50%';
-      circle.style.backgroundColor = '#4D148C'; // FedEx purple
-      circle.style.border = '2px solid #FF6600'; // FedEx orange
+      circle.style.backgroundColor = '#4D148C';
+      circle.style.border = '2px solid #FF6600';
       circle.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
       
-      // Add the FedEx icon
       const icon = document.createElement('div');
       icon.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -288,7 +285,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       circle.style.justifyContent = 'center';
       circle.appendChild(icon);
       
-      // Create the FedEx text label - Updated to include full "FedEx" text
       const label = document.createElement('div');
       label.style.position = 'absolute';
       label.style.left = '32px';
@@ -297,14 +293,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       label.style.fontWeight = 'bold';
       label.style.fontSize = '14px';
       label.style.padding = '4px 6px';
-      label.style.color = '#4D148C'; // FedEx purple
+      label.style.color = '#4D148C';
       label.style.backgroundColor = 'white';
       label.style.borderRadius = '4px';
       label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
       label.style.whiteSpace = 'nowrap';
       label.textContent = 'FedEx';
       
-      // Add components to marker element
       el.appendChild(circle);
       el.appendChild(label);
       
@@ -316,13 +311,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           </div>
         `);
       
-      // Set marker options to make it stay in place (not move with scroll)
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: 'bottom',
         offset: [0, 0],
-        pitchAlignment: 'map', // Keep aligned with the map plane
-        rotationAlignment: 'map' // Keep aligned with the map
+        pitchAlignment: 'map',
+        rotationAlignment: 'map'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
@@ -344,18 +338,15 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // Always clear all previous markers and layers before showing new results
     clearAllMarkers();
     clearFilteredLocations();
     
-    // Check for Dallas-specific property queries
     const isPropertyInDallas = 
       query.source === 'property' && 
       event.detail.isDallasQuery === true;
     
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
-    // Show properties only if explicitly asked about Dallas properties
     if (isPropertyInDallas) {
       console.log("Showing Dallas property locations");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
@@ -364,7 +355,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
-    // For non-Dallas property queries, don't show property pins automatically
     if (!isFedExQuery && query.source === 'property' && !isPropertyInDallas) {
       console.log("Non-Dallas property query, not showing property pins");
       emitResultsUpdate([]);
@@ -447,14 +437,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.className = `${locationType}-marker-filtered`;
       
       if (locationType === 'fedex') {
-        // Create a container with FedEx branding
         el.style.position = 'relative';
-        el.style.width = '90px'; // Increased width for full text
+        el.style.width = '90px';
         el.style.height = '35px';
         el.style.cursor = 'pointer';
         el.style.zIndex = '10';
         
-        // Create the circular part of the marker
         const circle = document.createElement('div');
         circle.style.position = 'absolute';
         circle.style.left = '0';
@@ -469,7 +457,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         circle.style.alignItems = 'center';
         circle.style.justifyContent = 'center';
         
-        // Add the FedEx icon
         const icon = document.createElement('div');
         icon.innerHTML = `
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -479,7 +466,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         `;
         circle.appendChild(icon);
         
-        // Create the FedEx text label - Updated with full "FedEx" text
         const label = document.createElement('div');
         label.style.position = 'absolute';
         label.style.left = '32px';
@@ -488,18 +474,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         label.style.fontWeight = 'bold';
         label.style.fontSize = '14px';
         label.style.padding = '4px 6px';
-        label.style.color = '#4D148C'; // FedEx purple
+        label.style.color = '#4D148C';
         label.style.backgroundColor = 'white';
         label.style.borderRadius = '4px';
         label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
         label.style.whiteSpace = 'nowrap';
         label.textContent = 'FedEx';
         
-        // Add components to marker element
         el.appendChild(circle);
         el.appendChild(label);
       } else {
-        // Property marker styling
         el.style.width = '24px';
         el.style.height = '34px';
         el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
@@ -525,13 +509,12 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         ? [location.coordinates[0], location.coordinates[1]] as [number, number]
         : [0, 0] as [number, number];
       
-      // Use marker options to make it stay in place
       const marker = new mapboxgl.Marker({
         element: el,
         anchor: 'bottom',
         offset: [0, 0],
-        pitchAlignment: 'map', // Keep aligned with the map plane
-        rotationAlignment: 'map' // Keep aligned with the map
+        pitchAlignment: 'map',
+        rotationAlignment: 'map'
       })
         .setLngLat(coordinates)
         .setPopup(popup)
@@ -584,4 +567,85 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         'line-color': '#FF6600',
         'line-width': 2,
         'line-opacity': 0.7,
-        'line-dasharray
+        'line-dasharray': [2, 1]
+      }
+    });
+    
+    map.current.addLayer({
+      id: 'connections-labels',
+      type: 'symbol',
+      source: 'connections',
+      layout: {
+        'text-field': '{distance} mi',
+        'text-font': ['Open Sans Regular'],
+        'text-size': 12,
+        'text-offset': [0, 0.1],
+        'text-anchor': 'center',
+        'symbol-placement': 'line-center'
+      },
+      paint: {
+        'text-color': '#000',
+        'text-halo-color': '#fff',
+        'text-halo-width': 2
+      }
+    });
+    
+    setActiveLayers([...activeLayers, ...layerIds]);
+  };
+
+  const clearAllMarkers = () => {
+    activeMarkers.forEach(marker => marker.remove());
+    setActiveMarkers([]);
+  };
+  
+  const clearFilteredLocations = () => {
+    if (!map.current) return;
+    
+    activeLayers.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
+    
+    ['connections'].forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        map.current.removeSource(sourceId);
+      }
+    });
+    
+    setActiveLayers([]);
+  };
+  
+  const fitMapToLocations = (coordinates: [number, number][]) => {
+    if (!map.current || !coordinates.length) return;
+    
+    const bounds = new mapboxgl.LngLatBounds();
+    
+    coordinates.forEach(coord => {
+      bounds.extend(coord);
+    });
+    
+    map.current.fitBounds(bounds, {
+      padding: { top: 50, bottom: 50, left: 50, right: 50 },
+      maxZoom: 15
+    });
+  };
+
+  useEffect(() => {
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    
+    return () => {
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={mapContainer}
+      className={`w-full h-full ${className}`}
+      style={{ borderRadius: '0.5rem' }}
+    />
+  );
+};
+
+export default Map;
