@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -8,7 +9,9 @@ import {
   checkAndRemoveLayers, 
   findPropertiesWithMultiTargetProximity,
   getCoordinates,
-  findLocationsWithTripleTypeProximity
+  findLocationsWithTripleTypeProximity,
+  findLocationsWithComplexSpatialQuery,
+  parseComplexSpatialQuery
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
@@ -605,6 +608,117 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearFilteredLocations();
     setVisibleLocationTypes([]);
     
+    // Handle complex spatial queries (near X but away from Y)
+    if (query.complexSpatialQuery) {
+      console.log("Processing complex spatial query:", query.complexSpatialQuery);
+      
+      const parsedQuery = parseComplexSpatialQuery(query.complexSpatialQuery);
+      if (parsedQuery) {
+        console.log("Parsed complex query:", parsedQuery);
+        
+        let includeLocations: LocationWithCoordinates[] = [];
+        let excludeLocations: LocationWithCoordinates[] = [];
+        
+        // Load appropriate locations based on the query
+        if (parsedQuery.includeType === 'fedex') {
+          includeLocations = loadFedExLocations();
+        } else if (parsedQuery.includeType === 'starbucks') {
+          includeLocations = STARBUCKS_LOCATIONS;
+        }
+        
+        if (parsedQuery.excludeType === 'fedex') {
+          excludeLocations = loadFedExLocations();
+        } else if (parsedQuery.excludeType === 'starbucks') {
+          excludeLocations = STARBUCKS_LOCATIONS;
+        }
+        
+        console.log(`Looking for properties within ${parsedQuery.includeRadius} miles of ${parsedQuery.includeType} and outside ${parsedQuery.excludeRadius} miles of ${parsedQuery.excludeType}`);
+        
+        // Find properties matching the complex spatial criteria
+        const result = findLocationsWithComplexSpatialQuery(
+          INDUSTRIAL_PROPERTIES,
+          includeLocations,
+          excludeLocations,
+          parsedQuery.includeRadius,
+          parsedQuery.excludeRadius
+        );
+        
+        const { resultLocations, includeConnections } = result;
+        
+        console.log(`Found ${resultLocations.length} properties matching the complex criteria`);
+        
+        if (resultLocations.length > 0) {
+          // Add property markers
+          addFilteredLocations(resultLocations, 'property', '#3366cc', '#ffffff');
+          
+          // Add markers for the included location type (what properties should be near)
+          const uniqueIncludeLocationsMap = new Map();
+          
+          includeConnections.forEach(conn => {
+            const targetLoc = includeLocations.find(loc => {
+              const coords = getCoordinates(loc);
+              return coords[0] === conn.target[0] && coords[1] === conn.target[1];
+            });
+            
+            if (targetLoc) {
+              const key = `${conn.target[0]}-${conn.target[1]}`;
+              uniqueIncludeLocationsMap.set(key, targetLoc);
+            }
+          });
+          
+          // Convert map values to array
+          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values());
+          
+          if (includeLocsToShow.length > 0) {
+            addFilteredLocations(
+              includeLocsToShow,
+              parsedQuery.includeType,
+              parsedQuery.includeType === 'fedex' ? '#FF6600' : '#00704A',
+              '#ffffff'
+            );
+          }
+          
+          // Add connection lines between properties and "include" locations
+          if (includeConnections.length > 0) {
+            addConnectionLines(includeConnections);
+          }
+          
+          // We'll also add a sample of exclude locations (with different styling) to show what's being avoided
+          // Just take the closest few exclude locations to the result area
+          const centerPoint = resultLocations.length > 0 
+            ? getCoordinates(resultLocations[0]) 
+            : [-96.7970, 32.7767]; // Dallas center if no results
+          
+          // Add a few exclude locations (max 5) to show what's being avoided
+          const excludeLocsToShow = excludeLocations
+            .slice(0, Math.min(5, excludeLocations.length));
+          
+          if (excludeLocsToShow.length > 0) {
+            addFilteredLocations(
+              excludeLocsToShow,
+              parsedQuery.excludeType,
+              '#999999', // Gray color to indicate "avoid" locations
+              '#ffffff'
+            );
+          }
+          
+          // Fit map to show all relevant locations
+          const allCoordinates = [
+            ...resultLocations.map(loc => getCoordinates(loc)),
+            ...includeLocsToShow.map(loc => getCoordinates(loc)),
+            ...excludeLocsToShow.map(loc => getCoordinates(loc))
+          ];
+          
+          fitMapToLocations(allCoordinates);
+          emitResultsUpdate(resultLocations);
+        } else {
+          console.log("No properties found matching the complex criteria");
+        }
+      }
+      
+      return; // Skip the rest of the processing
+    }
+    
     const isPropertyInDallas = 
       query.source === 'property' && 
       query.isDallasQuery === true;
@@ -734,7 +848,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             if (fedExTarget) {
               const fedExConnections = connections.filter(c => c.targetType === 'fedex');
               // Create a map to track unique FedEx locations
-              const uniqueFedExLocationsMap = new Map();
+              const uniqueFedExLocationsMap = new Map<string, LocationWithCoordinates>();
               
               fedExConnections.forEach(conn => {
                 const fedLoc = fedExLocations.find(f => 
@@ -757,7 +871,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             if (starbucksTarget) {
               const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
               // Create a map to track unique Starbucks locations
-              const uniqueStarbucksLocationsMap = new Map();
+              const uniqueStarbucksLocationsMap = new Map<string, LocationWithCoordinates>();
               
               starbucksConnections.forEach(conn => {
                 const sbLoc = STARBUCKS_LOCATIONS.find(s => 
@@ -894,7 +1008,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         if (connectionsForType.length > 0) {
           // Extract unique target locations
-          const uniqueLocationsMap = new Map();
+          const uniqueLocationsMap = new Map<string, LocationWithCoordinates>();
           
           connectionsForType.forEach(conn => {
             const targetLoc = data.locations.find(loc => {
@@ -963,11 +1077,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
     window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleLocationQuery as EventListener);
     
     return () => {
       console.log("Cleaning up event listeners in Map component");
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
       window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleLocationQuery as EventListener);
     };
   }, [mapInitialized, fedExLoaded, starbucksLoaded]);
 

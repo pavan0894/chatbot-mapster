@@ -19,7 +19,12 @@ const Index = () => {
       console.log("Index page received location query event:", e.detail);
     };
     
-    window.addEventListener('location-query', handleLocationQuery);
+    const handleComplexQuery = (e: any) => {
+      console.log("Index page received complex query event:", e.detail);
+    };
+    
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
     
     // Enhanced global error handling for event-related issues
     window.addEventListener('error', (e) => {
@@ -27,7 +32,8 @@ const Index = () => {
     });
     
     return () => {
-      window.removeEventListener('location-query', handleLocationQuery);
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
     };
   }, []);
 
