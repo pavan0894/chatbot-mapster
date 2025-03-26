@@ -4,7 +4,7 @@
  */
 
 // Default API key (fallback)
-export const DEFAULT_OPENAI_API_KEY = "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";
+export const DEFAULT_OPENAI_API_KEY = "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";
 
 // Get API key from localStorage or use the default one
 export const getOpenAIApiKey = (): string => {
