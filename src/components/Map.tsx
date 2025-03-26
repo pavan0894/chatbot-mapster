@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -711,7 +710,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             ...excludeLocsToShow.map(loc => getCoordinates(loc))
           ];
           
-          fitMapToLocations(allCoordinates);
+          fitMapToLocations(allCoordinates as [number, number][]);
           emitResultsUpdate(resultLocations);
         } else {
           console.log("No properties found matching the complex criteria");
@@ -863,7 +862,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
               });
               
               // Convert map values to array
-              const fedExLocsToShow: LocationWithCoordinates[] = Array.from(uniqueFedExLocationsMap.values());
+              const fedExLocsToShow = Array.from(uniqueFedExLocationsMap.values());
               if (fedExLocsToShow.length > 0) {
                 addFilteredLocations(fedExLocsToShow, 'fedex', '#FF6600', '#ffffff');
               }
@@ -886,14 +885,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
               });
               
               // Convert to array and add markers
-              const locationsToShow: LocationWithCoordinates[] = Array.from(uniqueStarbucksLocationsMap.values());
+              const starbucksToShow = Array.from(uniqueStarbucksLocationsMap.values());
               
-              if (locationsToShow.length > 0) {
+              if (starbucksToShow.length > 0) {
                 addFilteredLocations(
-                  locationsToShow, 
+                  starbucksToShow, 
                   'starbucks',
-                  locationType === 'fedex' ? '#FF6600' : 
-                    locationType === 'starbucks' ? '#00704A' : '#3366cc',
+                  '#00704A',
                   '#ffffff'
                 );
               }
@@ -916,7 +914,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
               ...connections.map(conn => conn.target)
             ];
             
-            fitMapToLocations(allCoordinates);
+            fitMapToLocations(allCoordinates as [number, number][]);
             
             // Emit results if the primary type is properties
             if (query.source === 'property') {
@@ -1016,8 +1014,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         // Skip if this is the primary type
         if (type === query.source) return;
         
-        const locationType = type as LocationSourceTarget;
-        const connectionsForType = connections.filter(c => c.targetType === locationType);
+        const currentType = type as LocationSourceTarget;
+        const connectionsForType = connections.filter(c => c.targetType === currentType);
         
         if (connectionsForType.length > 0) {
           // Extract unique target locations
@@ -1041,9 +1039,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           if (locationsToShow.length > 0) {
             addFilteredLocations(
               locationsToShow, 
-              locationType,
-              locationType === 'fedex' ? '#FF6600' : 
-                locationType === 'starbucks' ? '#00704A' : '#3366cc',
+              currentType,
+              currentType === 'fedex' ? '#FF6600' : 
+                currentType === 'starbucks' ? '#00704A' : '#3366cc',
               '#ffffff'
             );
           }
@@ -1067,7 +1065,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         ...connections.map(conn => conn.target)
       ];
       
-      fitMapToLocations(allCoordinates);
+      fitMapToLocations(allCoordinates as [number, number][]);
       
       // Emit results if the primary type is properties
       if (query.source === 'property') {
