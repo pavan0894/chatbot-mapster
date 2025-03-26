@@ -39,7 +39,7 @@ export function logVisibleLocationTypes(types: string[]): void {
 }
 
 // Verify an event was properly created
-export function verifyEventCreation(eventName: string, data: any): void {
+export function verifyEventCreation(eventName: string, data: any): CustomEvent<any> {
   console.log(`Creating ${eventName} event with data:`, data);
   const event = new CustomEvent(eventName, { detail: data });
   console.log(`Event created:`, event.type, event.detail);
