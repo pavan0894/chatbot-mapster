@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -17,19 +16,19 @@ export interface LocationQuery {
   source: LocationSourceTarget;
   target?: LocationSourceTarget;
   radius: number;
-  isDallasQuery?: boolean; // Added field to track if this is a Dallas area query
-  queryText?: string; // Store the original query text
+  isDallasQuery?: boolean;
+  queryText?: string;
   complexQuery?: {
     includeType: LocationSourceTarget;
     excludeType: LocationSourceTarget;
     includeRadius: number;
     excludeRadius: number;
-  }; // Added field for complex spatial queries
+  };
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
 export const API_QUERY_EVENT = 'api-query-event';
-export const COMPLEX_QUERY_EVENT = 'complex-query-event'; // New event for complex spatial queries
+export const COMPLEX_QUERY_EVENT = 'complex-query-event';
 
 export function emitLocationQuery(query: LocationQuery) {
   console.log("Emitting location query:", query);
@@ -168,7 +167,6 @@ function isLocationQuery(message: string): LocationQuery | null {
   
   const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
   
-  // Check if this is a showing request using the showPatterns
   const isShowRequest = showPatterns.some(pattern => pattern.test(message));
   
   if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
@@ -191,7 +189,7 @@ function isLocationQuery(message: string): LocationQuery | null {
     };
   }
   
-  if (hasProperty && isDallasQuery && isShowRequest) {
+  if (isDallasQuery && hasProperty) {
     console.log("Detected request for properties in Dallas area");
     return { 
       source: 'property' as LocationSourceTarget, 
