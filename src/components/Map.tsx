@@ -136,9 +136,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         });
         
         setMapInitialized(true);
-        
-        // Initialize map but don't show any markers by default
-        // This is the change - no calling resetMap() here
       });
       
       const secondsPerRevolution = 240;
@@ -257,21 +254,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
-      el.style.position = 'relative';
-      el.style.width = '90px';
-      el.style.height = '35px';
+      el.style.width = '30px';
+      el.style.height = '30px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#4D148C';
+      el.style.border = '2px solid #FF6600';
+      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
       el.style.cursor = 'pointer';
-      
-      const circle = document.createElement('div');
-      circle.style.position = 'absolute';
-      circle.style.left = '0';
-      circle.style.top = '0';
-      circle.style.width = '28px';
-      circle.style.height = '28px';
-      circle.style.borderRadius = '50%';
-      circle.style.backgroundColor = '#4D148C';
-      circle.style.border = '2px solid #FF6600';
-      circle.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      el.style.position = 'relative';
       
       const icon = document.createElement('div');
       icon.innerHTML = `
@@ -280,19 +273,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
-      circle.style.display = 'flex';
-      circle.style.alignItems = 'center';
-      circle.style.justifyContent = 'center';
-      circle.appendChild(icon);
+      el.appendChild(icon);
+      
+      const labelContainer = document.createElement('div');
+      labelContainer.style.position = 'absolute';
+      labelContainer.style.top = '-30px';
+      labelContainer.style.left = '50%';
+      labelContainer.style.transform = 'translateX(-50%)';
+      labelContainer.style.pointerEvents = 'none';
       
       const label = document.createElement('div');
-      label.style.position = 'absolute';
-      label.style.left = '32px';
-      label.style.top = '0';
       label.style.fontFamily = 'Arial, sans-serif';
       label.style.fontWeight = 'bold';
-      label.style.fontSize = '14px';
-      label.style.padding = '4px 6px';
+      label.style.fontSize = '12px';
+      label.style.padding = '2px 4px';
       label.style.color = '#4D148C';
       label.style.backgroundColor = 'white';
       label.style.borderRadius = '4px';
@@ -300,8 +294,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       label.style.whiteSpace = 'nowrap';
       label.textContent = 'FedEx';
       
-      el.appendChild(circle);
-      el.appendChild(label);
+      labelContainer.appendChild(label);
+      el.appendChild(labelContainer);
       
       const popup = new mapboxgl.Popup({ offset: [0, -15] })
         .setHTML(`
@@ -313,7 +307,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: 'bottom',
+        anchor: 'center',
         offset: [0, 0]
       })
         .setLngLat(location.coordinates as [number, number])
@@ -431,29 +425,23 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const markers: mapboxgl.Marker[] = [];
     
     locations.forEach(location => {
-      const el = document.createElement('div');
-      el.className = `${locationType}-marker-filtered`;
+      let el: HTMLDivElement;
       
       if (locationType === 'fedex') {
-        el.style.position = 'relative';
-        el.style.width = '90px';
-        el.style.height = '35px';
+        el = document.createElement('div');
+        el.className = `${locationType}-marker-filtered`;
+        el.style.width = '30px';
+        el.style.height = '30px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = bgColor;
+        el.style.border = `2px solid ${borderColor}`;
+        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
         el.style.cursor = 'pointer';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.position = 'relative';
         el.style.zIndex = '10';
-        
-        const circle = document.createElement('div');
-        circle.style.position = 'absolute';
-        circle.style.left = '0';
-        circle.style.top = '0';
-        circle.style.width = '28px';
-        circle.style.height = '28px';
-        circle.style.borderRadius = '50%';
-        circle.style.backgroundColor = bgColor;
-        circle.style.border = `2px solid ${borderColor}`;
-        circle.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
-        circle.style.display = 'flex';
-        circle.style.alignItems = 'center';
-        circle.style.justifyContent = 'center';
         
         const icon = document.createElement('div');
         icon.innerHTML = `
@@ -462,16 +450,20 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         `;
-        circle.appendChild(icon);
+        el.appendChild(icon);
+        
+        const labelContainer = document.createElement('div');
+        labelContainer.style.position = 'absolute';
+        labelContainer.style.top = '-30px';
+        labelContainer.style.left = '50%';
+        labelContainer.style.transform = 'translateX(-50%)';
+        labelContainer.style.pointerEvents = 'none';
         
         const label = document.createElement('div');
-        label.style.position = 'absolute';
-        label.style.left = '32px';
-        label.style.top = '0';
         label.style.fontFamily = 'Arial, sans-serif';
         label.style.fontWeight = 'bold';
-        label.style.fontSize = '14px';
-        label.style.padding = '4px 6px';
+        label.style.fontSize = '12px';
+        label.style.padding = '2px 4px';
         label.style.color = '#4D148C';
         label.style.backgroundColor = 'white';
         label.style.borderRadius = '4px';
@@ -479,9 +471,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         label.style.whiteSpace = 'nowrap';
         label.textContent = 'FedEx';
         
-        el.appendChild(circle);
-        el.appendChild(label);
+        labelContainer.appendChild(label);
+        el.appendChild(labelContainer);
       } else {
+        el = document.createElement('div');
+        el.className = `${locationType}-marker-filtered`;
         el.style.width = '24px';
         el.style.height = '34px';
         el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
@@ -493,7 +487,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -25] : 25 
+        offset: locationType === 'property' ? [0, -25] : [0, -15]
       }).setHTML(`
         <div style="padding: 5px;">
           <h3 style="font-weight: bold; margin-bottom: 5px; ${
@@ -509,7 +503,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: 'bottom',
+        anchor: locationType === 'fedex' ? 'center' : 'bottom',
         offset: [0, 0]
       })
         .setLngLat(coordinates)
