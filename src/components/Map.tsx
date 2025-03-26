@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -369,7 +368,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       let el;
       
       if (locationType === 'property') {
-        // Create static property markers that won't move with map interaction
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
         el.style.width = '14px';
@@ -400,6 +398,58 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         pinShape.appendChild(pinCenter);
         el.appendChild(pinShape);
+        
+        const popup = new mapboxgl.Popup({ 
+          offset: [0, -10],
+          closeButton: false,
+          closeOnClick: true
+        }).setHTML(`
+          <div style="padding: 8px; max-width: 200px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px;">${location.name}</h3>
+            <p style="margin: 0;">${location.description}</p>
+          </div>
+        `);
+        
+        const markerContainer = document.createElement('div');
+        markerContainer.className = 'mapboxgl-property-fixed-marker';
+        markerContainer.style.position = 'absolute';
+        markerContainer.style.pointerEvents = 'auto';
+        markerContainer.style.zIndex = '1';
+        markerContainer.appendChild(el);
+        
+        const lngLat = location.coordinates as [number, number];
+        const pixelPosition = map.current.project(lngLat);
+        
+        markerContainer.style.left = `${pixelPosition.x}px`;
+        markerContainer.style.top = `${pixelPosition.y}px`;
+        markerContainer.style.transform = 'translate(-50%, -100%)';
+        
+        const mapContainer = map.current.getContainer();
+        mapContainer.querySelector('.mapboxgl-canvas-container')?.appendChild(markerContainer);
+        
+        markerContainer.addEventListener('click', () => {
+          popup.setLngLat(lngLat).addTo(map.current!);
+        });
+        
+        const updatePosition = () => {
+          const newPixelPosition = map.current!.project(lngLat);
+          markerContainer.style.left = `${newPixelPosition.x}px`;
+          markerContainer.style.top = `${newPixelPosition.y}px`;
+        };
+        
+        map.current.on('move', updatePosition);
+        map.current.on('zoom', updatePosition);
+        
+        const markerInfo = {
+          remove: () => {
+            markerContainer.remove();
+            map.current?.off('move', updatePosition);
+            map.current?.off('zoom', updatePosition);
+            popup.remove();
+          }
+        };
+        
+        markers.push(markerInfo as any);
       } else {
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
@@ -425,33 +475,32 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           `;
           el.appendChild(iconContainer);
         }
+        
+        const popup = new mapboxgl.Popup({ 
+          offset: locationType === 'property' ? [0, -10] : [0, 0],
+          closeButton: false,
+          closeOnClick: true
+        }).setHTML(`
+          <div style="padding: 8px; max-width: 200px;">
+            <h3 style="font-weight: bold; margin-bottom: 5px;">${location.name}</h3>
+            <p style="margin: 0;">${location.description}</p>
+          </div>
+        `);
+        
+        const marker = new mapboxgl.Marker({
+          element: el,
+          anchor: locationType === 'property' ? 'bottom' : 'center',
+          pitchAlignment: 'map',
+          rotationAlignment: 'map',
+          rotation: 0,
+          offset: [0, 0]
+        })
+          .setLngLat(location.coordinates as [number, number])
+          .setPopup(popup)
+          .addTo(map.current);
+        
+        markers.push(marker);
       }
-      
-      const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -10] : [0, 0],
-        closeButton: false,
-        closeOnClick: true
-      }).setHTML(`
-        <div style="padding: 8px; max-width: 200px;">
-          <h3 style="font-weight: bold; margin-bottom: 5px;">${location.name}</h3>
-          <p style="margin: 0;">${location.description}</p>
-        </div>
-      `);
-      
-      // Create marker with fixed configuration for property pins
-      const marker = new mapboxgl.Marker({
-        element: el,
-        anchor: locationType === 'property' ? 'bottom' : 'center',
-        pitchAlignment: 'map',           // Keep orientation fixed relative to map
-        rotationAlignment: 'map',        // Keep rotation fixed relative to map
-        rotation: 0,                     // Ensure no rotation is applied
-        offset: [0, 0]                   // No offset to keep exact positioning
-      })
-        .setLngLat(location.coordinates as [number, number])
-        .setPopup(popup)
-        .addTo(map.current);
-      
-      markers.push(marker);
     });
     
     setActiveMarkers(prev => [...prev, ...markers]);
