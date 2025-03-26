@@ -594,9 +594,13 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     console.log("Setting up event listener for location queries");
     
     const handleLocationQueryTyped = (e: Event) => {
-      handleLocationQuery(e as CustomEvent<LocationQuery>);
+      // Ensure the event is properly handled and casted
+      const customEvent = e as CustomEvent<LocationQuery>;
+      console.log("Received location query event:", customEvent.detail);
+      handleLocationQuery(customEvent);
     };
     
+    // Make sure we're actually listening to the event
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
     
     return () => {
