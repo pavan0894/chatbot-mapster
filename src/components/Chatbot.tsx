@@ -32,6 +32,7 @@ export interface LocationQuery {
     }[];
   };
   dynamicQuery?: {
+    primaryType: LocationSourceTarget;
     targetTypes: {
       [key in LocationSourceTarget]?: {
         radius: number;
@@ -94,11 +95,12 @@ function isLocationQuery(message: string): LocationQuery | null {
   if (anyMultiLocationQuery) {
     console.log("Detected flexible multi-location query:", anyMultiLocationQuery);
     return {
-      source: anyMultiLocationQuery.primaryType,
-      radius: 5, // Default radius
+      source: 'property' as LocationSourceTarget,
+      radius: 5,
       isDallasQuery: message.includes('dallas') || message.includes('dfw'),
       queryText: message,
       dynamicQuery: {
+        primaryType: anyMultiLocationQuery.primaryType,
         targetTypes: anyMultiLocationQuery.targetTypes
       }
     };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -829,16 +828,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addFilteredLocations(result.resultLocations, 'property', '#2563EB', '#1E40AF');
       
-      addConnectionLines(result.includeConnections);
+      addConnectionLines(result.connections);
       
       const coordinatesToShow = [
         ...result.resultLocations.map(p => getCoordinates(p)),
-        ...result.includeConnections.map(c => c.target)
+        ...result.connections.map(c => c.target)
       ];
       
       fitMapToLocations(coordinatesToShow);
       emitResultsUpdate(result.resultLocations);
-      setVisibleLocationTypes(['property', includeType, excludeType].filter(t => t !== 'property'));
+      setVisibleLocationTypes(['property', includeType, excludeType]);
     } else {
       console.log("No properties found matching the complex spatial criteria");
       console.log("Showing fallback properties instead");
@@ -881,7 +880,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       fitMapToLocations(coordinatesToShow);
       emitResultsUpdate(COMPLEX_QUERY_FALLBACK_PROPERTIES);
-      setVisibleLocationTypes(['property', includeType, excludeType].filter(t => t !== 'property'));
+      setVisibleLocationTypes(['property', includeType, excludeType].filter(Boolean) as string[]);
     }
     
     setCurrentQuery(query);
@@ -975,7 +974,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Use Object.entries to get array of [key, value] pairs for iteration
     const targetTypeEntries = Object.entries(targetTypes)
-      .filter(([key]) => key === 'fedex' || key === 'starbucks')
+      .filter(([key]) => key === 'fedex' || key === 'starbucks' || key === 'property')
       .map(([key, value]) => ({ type: key as LocationSourceTarget, ...value }));
     
     console.log(`Finding properties near primary type: ${primaryType} and target types: ${targetTypeEntries.map(t => t.type).join(', ')}`);
@@ -991,31 +990,22 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Process each target type
     targetTypeEntries.forEach(targetTypeEntry => {
-      let currentTargetLocations: LocationWithCoordinates[] = [];
+      let targetLocations: LocationWithCoordinates[] = [];
       
       if (targetTypeEntry.type === 'fedex') {
-        currentTargetLocations = fedExLoaded ? fedExLocations : addFedExLocations();
+        targetLocations = fedExLoaded ? fedExLocations : addFedExLocations();
       } else if (targetTypeEntry.type === 'starbucks') {
-        currentTargetLocations = starbucksLoaded ? STARBUCKS_LOCATIONS : addStarbucksLocations();
+        targetLocations = starbucksLoaded ? STARBUCKS_LOCATIONS : addStarbucksLocations();
+      } else {
+        return; // Skip if type is not recognized
       }
       
-      // Create the target config for this specific type
-      const targetConfig = {
-        [targetTypeEntry.type]: {
-          locations: currentTargetLocations,
-          radius: targetTypeEntry.radius
-        }
-      };
-      
+      // Create the config for findLocationsWithTripleTypeProximity
       const result = findLocationsWithTripleTypeProximity(
         INDUSTRIAL_PROPERTIES,
-        {
-          [primaryType]: {
-            locations: primaryTypeLocations,
-            radius: 5 // Default radius if not specified
-          },
-          ...targetConfig
-        }
+        primaryTypeLocations,
+        targetLocations,
+        targetTypeEntry.radius || 5 // Default radius if not specified
       );
       
       if (result.resultLocations.length > 0) {
@@ -1032,7 +1022,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         emitResultsUpdate(result.resultLocations);
         
-        setVisibleLocationTypes(['property', primaryType, targetTypeEntry.type].filter(t => t !== 'property'));
+        setVisibleLocationTypes(prev => {
+          const newTypes = ['property', primaryType, targetTypeEntry.type];
+          return [...new Set([...prev, ...newTypes])];
+        });
       }
     });
     
