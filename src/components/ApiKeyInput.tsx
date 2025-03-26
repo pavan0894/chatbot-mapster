@@ -1,20 +1,12 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const ApiKeyInput: React.FC = () => {
-  // Since we're not using OpenAI API anymore, this component is simplified
   return (
     <Card className="w-full max-w-md mx-auto my-4">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <AlertCircle size={18} className="text-green-500" />
-          Location Search Ready
-        </CardTitle>
-        <CardDescription>
-          The map is ready to display locations. Start searching in the chat below.
-        </CardDescription>
+        <CardTitle className="text-center">Survey Agent</CardTitle>
       </CardHeader>
     </Card>
   );
