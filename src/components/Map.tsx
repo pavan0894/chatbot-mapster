@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -89,6 +90,8 @@ export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
 interface MapProps {
   className?: string;
 }
+
+type LocationType = 'fedex' | 'property' | 'starbucks';
 
 const Map: React.FC<MapProps> = ({ className = '' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
