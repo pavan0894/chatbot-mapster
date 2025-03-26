@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, Loader2 } from 'lucide-react';
 import ChatMessage, { MessageType } from './ChatMessage';
@@ -119,24 +120,40 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      let source: LocationSourceTarget = 'starbucks';
+      const source: LocationSourceTarget = 'starbucks';
       let target: LocationSourceTarget | undefined = 'property';
       
       if (lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
-          source = 'starbucks';
-          target = 'fedex';
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'fedex' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'fedex';
-          target = 'starbucks';
+          return {
+            type: 'location_search',
+            source: 'fedex' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         }
       } else if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
-          source = 'starbucks';
-          target = 'property';
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'property' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'property';
-          target = 'starbucks';
+          return {
+            type: 'location_search',
+            source: 'property' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         }
       }
       
@@ -159,33 +176,39 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         radius = parseInt(radiusMatch[1]);
       }
       
-      let source: LocationSourceTarget;
-      let target: LocationSourceTarget;
-      
       if (lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('fedex') < lowerMsg.indexOf('starbucks')) {
-          source = 'fedex';
-          target = 'starbucks';
+          return {
+            type: 'location_search',
+            source: 'fedex' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'starbucks';
-          target = 'fedex';
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'fedex' as LocationSourceTarget,
+            radius
+          };
         }
       } else {
         if (lowerMsg.indexOf('propert') < lowerMsg.indexOf('starbucks')) {
-          source = 'property' as LocationSourceTarget;
-          target = 'starbucks' as LocationSourceTarget;
+          return {
+            type: 'location_search',
+            source: 'property' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'starbucks' as LocationSourceTarget;
-          target = 'property' as LocationSourceTarget;
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'property' as LocationSourceTarget,
+            radius
+          };
         }
       }
-      
-      return {
-        type: 'location_search',
-        source,
-        target,
-        radius
-      };
     }
     
     if (
@@ -203,19 +226,35 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       
       if (lowerMsg.includes('starbucks') && lowerMsg.includes('fedex')) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
-          source = 'starbucks';
-          target = 'fedex';
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'fedex' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'fedex';
-          target = 'starbucks';
+          return {
+            type: 'location_search',
+            source: 'fedex' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         }
       } else if (lowerMsg.includes('starbucks') && (lowerMsg.includes('property') || lowerMsg.includes('properties'))) {
         if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
-          source = 'starbucks';
-          target = 'property';
+          return {
+            type: 'location_search',
+            source: 'starbucks' as LocationSourceTarget,
+            target: 'property' as LocationSourceTarget,
+            radius
+          };
         } else {
-          source = 'property';
-          target = 'starbucks';
+          return {
+            type: 'location_search',
+            source: 'property' as LocationSourceTarget,
+            target: 'starbucks' as LocationSourceTarget,
+            radius
+          };
         }
       } else if (lowerMsg.includes('fedex')) {
         source = 'fedex';
@@ -239,7 +278,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
          lowerMsg.includes('find') || lowerMsg.includes('locate') || lowerMsg.includes('search'))) {
       return {
         type: 'location_search',
-        source: 'starbucks',
+        source: 'starbucks' as LocationSourceTarget,
         radius: 10 // Larger default radius for general searches
       };
     }
