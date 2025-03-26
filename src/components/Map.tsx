@@ -459,7 +459,10 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const targetColors = query.target ? getMarkerColors(query.target) : { bg: '#333', border: '#fff' };
       
       addFilteredLocations(sourceLocations, query.source, sourceColors.bg, sourceColors.border);
-      addFilteredLocations(targetLocations, query.target!, targetColors.bg, targetColors.border);
+      
+      if (targetLocations.length > 0 && query.target) {
+        addFilteredLocations(targetLocations, query.target, targetColors.bg, targetColors.border);
+      }
       
       addConnectionLines(connections);
       
@@ -475,7 +478,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 
   const addFilteredLocations = (
     locations: LocationWithCoordinates[],
-    locationType: 'fedex' | 'property' | 'starbucks',
+    locationType: string,
     bgColor: string,
     borderColor: string
   ) => {
