@@ -244,7 +244,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.style.alignItems = 'center';
       el.style.justifyContent = 'center';
       
-      // Updated FedEx logo SVG to match official logo
       el.innerHTML = `
         <svg width="24" height="24" viewBox="0 0 960 282" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M364 156H273V107H364V156Z" fill="#FF5900"/>
@@ -369,21 +368,16 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       let el;
       
       if (locationType === 'property') {
-        // Create a Google Maps style pin for properties
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
-        el.style.width = '24px';
-        el.style.height = '36px';
-        el.style.backgroundImage = `
-          linear-gradient(${bgColor} 50%, transparent 0%)
-        `;
+        el.style.width = '20px';
+        el.style.height = '30px';
         el.style.position = 'relative';
         el.style.cursor = 'pointer';
         
-        // Create pin shape
         const pinShape = document.createElement('div');
-        pinShape.style.width = '24px';
-        pinShape.style.height = '24px';
+        pinShape.style.width = '20px';
+        pinShape.style.height = '20px';
         pinShape.style.borderRadius = '50% 50% 50% 0';
         pinShape.style.background = bgColor;
         pinShape.style.transform = 'rotate(-45deg)';
@@ -393,20 +387,18 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         pinShape.style.border = `2px solid ${borderColor}`;
         pinShape.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
         
-        // Create pin center dot
         const pinCenter = document.createElement('div');
-        pinCenter.style.width = '10px';
-        pinCenter.style.height = '10px';
+        pinCenter.style.width = '8px';
+        pinCenter.style.height = '8px';
         pinCenter.style.background = borderColor;
         pinCenter.style.borderRadius = '50%';
         pinCenter.style.position = 'absolute';
-        pinCenter.style.top = '7px';
-        pinCenter.style.left = '7px';
+        pinCenter.style.top = '6px';
+        pinCenter.style.left = '6px';
         
         pinShape.appendChild(pinCenter);
         el.appendChild(pinShape);
       } else {
-        // Keep the circular style for other location types
         el = document.createElement('div');
         el.className = `${locationType}-marker`;
         el.style.width = locationType === 'property' ? '28px' : '24px';
@@ -434,7 +426,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
       
       const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -20] : [0, 0],
+        offset: locationType === 'property' ? [0, -15] : [0, 0],
         closeButton: false,
         closeOnClick: true
       }).setHTML(`
@@ -446,7 +438,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const marker = new mapboxgl.Marker({
         element: el,
-        anchor: locationType === 'property' ? 'bottom' : 'center'
+        anchor: locationType === 'property' ? 'bottom' : 'center',
+        pitchAlignment: 'map',
+        rotationAlignment: 'map'
       })
         .setLngLat(location.coordinates as [number, number])
         .setPopup(popup)
@@ -470,7 +464,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
   const clearFilteredLocations = () => {
     if (!map.current) return;
     
-    // Clear any existing connection lines
     const lineLayerIds = ['connections-layer'];
     checkAndRemoveLayers(map.current, lineLayerIds, 'connections');
     
@@ -483,7 +476,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     console.log(`Adding ${connections.length} connection lines to map`);
     
-    // Create GeoJSON for connections
     const geojson = {
       type: 'FeatureCollection',
       features: connections.map(conn => ({
@@ -498,11 +490,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }))
     };
     
-    // Clear any existing connection lines
     const lineLayerIds = ['connections-layer'];
     checkAndRemoveLayers(map.current, lineLayerIds, 'connections');
     
-    // Add the new source and layer
     map.current.addSource('connections', {
       type: 'geojson',
       data: geojson as any
