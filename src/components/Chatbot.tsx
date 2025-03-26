@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -170,7 +169,7 @@ function isLocationQuery(message: string): LocationQuery | null {
   
   const isShowRequest = showPatterns.some(pattern => pattern.test(message));
   
-  if (hasStarbucks && (askingForAll || !hasProximity) && !hasProperty && !hasFedEx) {
+  if (hasStarbucks && !hasProperty && !hasFedEx) {
     console.log("Detected request for Starbucks locations");
     return { 
       source: 'starbucks' as LocationSourceTarget, 

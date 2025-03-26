@@ -11,7 +11,7 @@ const Index = () => {
         <div className="w-full lg:w-1/2 h-full border-r border-border overflow-hidden">
           <Chatbot />
         </div>
-        <div className="w-full lg:w-1/2 h-full border-l border-border">
+        <div className="w-full lg:w-1/2 h-full border-l border-border overflow-hidden">
           <Map />
         </div>
       </div>
