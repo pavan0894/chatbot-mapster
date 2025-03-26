@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -256,17 +257,25 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
-      el.style.width = '28px';
-      el.style.height = '28px';
-      el.style.borderRadius = '50%';
-      el.style.backgroundColor = '#4D148C';
-      el.style.border = '2px solid #FF6600';
-      el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      // Create a container with FedEx branding
+      el.style.position = 'relative';
+      el.style.width = '80px';
+      el.style.height = '35px';
       el.style.cursor = 'pointer';
-      el.style.display = 'flex';
-      el.style.alignItems = 'center';
-      el.style.justifyContent = 'center';
       
+      // Create the circular part of the marker
+      const circle = document.createElement('div');
+      circle.style.position = 'absolute';
+      circle.style.left = '0';
+      circle.style.top = '0';
+      circle.style.width = '28px';
+      circle.style.height = '28px';
+      circle.style.borderRadius = '50%';
+      circle.style.backgroundColor = '#4D148C'; // FedEx purple
+      circle.style.border = '2px solid #FF6600'; // FedEx orange
+      circle.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
+      
+      // Add the FedEx icon
       const icon = document.createElement('div');
       icon.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -274,9 +283,31 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       `;
-      el.appendChild(icon);
+      circle.style.display = 'flex';
+      circle.style.alignItems = 'center';
+      circle.style.justifyContent = 'center';
+      circle.appendChild(icon);
       
-      const popup = new mapboxgl.Popup({ offset: 25 })
+      // Create the FedEx text label
+      const label = document.createElement('div');
+      label.style.position = 'absolute';
+      label.style.left = '32px';
+      label.style.top = '0';
+      label.style.fontFamily = 'Arial, sans-serif';
+      label.style.fontWeight = 'bold';
+      label.style.fontSize = '16px';
+      label.style.padding = '2px';
+      label.style.color = '#4D148C'; // FedEx purple
+      label.style.backgroundColor = 'white';
+      label.style.borderRadius = '4px';
+      label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
+      label.textContent = 'FedEx';
+      
+      // Add components to marker element
+      el.appendChild(circle);
+      el.appendChild(label);
+      
+      const popup = new mapboxgl.Popup({ offset: [0, -15] })
         .setHTML(`
           <div style="padding: 5px;">
             <h3 style="font-weight: bold; margin-bottom: 5px; color: #4D148C;">${location.name}</h3>
@@ -305,6 +336,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
+    // Always clear all previous markers and layers before showing new results
     clearAllMarkers();
     clearFilteredLocations();
     
@@ -394,18 +426,29 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.className = `${locationType}-marker-filtered`;
       
       if (locationType === 'fedex') {
-        el.style.width = '28px';
-        el.style.height = '28px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = bgColor;
-        el.style.border = `2px solid ${borderColor}`;
-        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+        // Create a container with FedEx branding
+        el.style.position = 'relative';
+        el.style.width = '80px';
+        el.style.height = '35px';
         el.style.cursor = 'pointer';
         el.style.zIndex = '10';
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
         
+        // Create the circular part of the marker
+        const circle = document.createElement('div');
+        circle.style.position = 'absolute';
+        circle.style.left = '0';
+        circle.style.top = '0';
+        circle.style.width = '28px';
+        circle.style.height = '28px';
+        circle.style.borderRadius = '50%';
+        circle.style.backgroundColor = bgColor;
+        circle.style.border = `2px solid ${borderColor}`;
+        circle.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25), 0 0 0 8px rgba(255,255,255,0.5)';
+        circle.style.display = 'flex';
+        circle.style.alignItems = 'center';
+        circle.style.justifyContent = 'center';
+        
+        // Add the FedEx icon
         const icon = document.createElement('div');
         icon.innerHTML = `
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -413,7 +456,26 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             <path d="M5 15.5L12 21L19 15.5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         `;
-        el.appendChild(icon);
+        circle.appendChild(icon);
+        
+        // Create the FedEx text label
+        const label = document.createElement('div');
+        label.style.position = 'absolute';
+        label.style.left = '32px';
+        label.style.top = '0';
+        label.style.fontFamily = 'Arial, sans-serif';
+        label.style.fontWeight = 'bold';
+        label.style.fontSize = '16px';
+        label.style.padding = '2px';
+        label.style.color = '#4D148C'; // FedEx purple
+        label.style.backgroundColor = 'white';
+        label.style.borderRadius = '4px';
+        label.style.boxShadow = '0 1px 2px rgba(0,0,0,0.2)';
+        label.textContent = 'FedEx';
+        
+        // Add components to marker element
+        el.appendChild(circle);
+        el.appendChild(label);
       } else {
         el.style.width = '24px';
         el.style.height = '34px';
@@ -627,4 +689,3 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
 };
 
 export default Map;
-
