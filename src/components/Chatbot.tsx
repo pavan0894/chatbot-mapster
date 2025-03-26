@@ -546,45 +546,47 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
       <CardHeader className="py-3 px-4 border-b">
         <CardTitle className="text-lg">Survey Agent</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col h-full p-0 relative">
-        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 pb-20">
-          <div className="flex flex-col space-y-4">
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            {isProcessing && (
-              <div className="flex items-center space-x-2 text-muted-foreground">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+      <CardContent className="flex flex-col h-full p-0 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <ScrollArea ref={scrollAreaRef} className="flex-grow p-4 pb-28">
+            <div className="flex flex-col space-y-4">
+              {messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              {isProcessing && (
+                <div className="flex items-center space-x-2 text-muted-foreground">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <span className="text-sm">Thinking...</span>
                 </div>
-                <span className="text-sm">Thinking...</span>
-              </div>
-            )}
-            
-            {messages.length > 1 && !isProcessing && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {generateSuggestedQuestions(messages.filter(m => m.id !== 'welcome').map(m => ({
-                  role: m.sender === 'user' ? 'user' : 'assistant',
-                  content: m.text
-                }))).slice(0, 3).map((suggestion, index) => (
-                  <Button 
-                    key={`suggestion-${index}`} 
-                    variant="outline" 
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => handleSuggestionClick(suggestion)}
-                  >
-                    {suggestion.length > 60 ? suggestion.substring(0, 57) + '...' : suggestion}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+              )}
+              
+              {messages.length > 1 && !isProcessing && (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {generateSuggestedQuestions(messages.filter(m => m.id !== 'welcome').map(m => ({
+                    role: m.sender === 'user' ? 'user' : 'assistant',
+                    content: m.text
+                  }))).slice(0, 3).map((suggestion, index) => (
+                    <Button 
+                      key={`suggestion-${index}`} 
+                      variant="outline" 
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => handleSuggestionClick(suggestion)}
+                    >
+                      {suggestion.length > 60 ? suggestion.substring(0, 57) + '...' : suggestion}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
 
-        <div className="p-4 border-t border-border w-full absolute bottom-0 bg-background">
+        <div className="p-4 border-t border-border w-full bg-background sticky bottom-0 z-10">
           <div className="flex items-center space-x-2">
             <Input
               id="chat-input"
