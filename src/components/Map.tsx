@@ -108,9 +108,9 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       const newMap = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/light-v11',
-        projection: 'globe',
-        zoom: 9,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        projection: 'albers',
+        zoom: 10,
         center: [-96.7970, 32.7767],
         pitch: 45,
       });

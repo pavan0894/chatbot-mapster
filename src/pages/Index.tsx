@@ -16,12 +16,9 @@ const Index = () => {
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-primary font-semibold">M</span>
               </div>
-              <h1 className="text-lg font-medium ml-3">MapChat</h1>
+              <h1 className="text-lg font-medium ml-3">Survey Agent</h1>
             </div>
             <nav className="hidden md:flex items-center space-x-6">
-              <a href="#" className="text-sm text-foreground/70 hover:text-foreground transition-colors">About</a>
-              <a href="#" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Features</a>
-              <a href="#" className="text-sm text-foreground/70 hover:text-foreground transition-colors">Contact</a>
             </nav>
           </div>
         </header>
@@ -46,7 +43,7 @@ const Index = () => {
 
         {/* Minimal Footer */}
         <footer className="w-full py-2 px-6 border-t border-border text-center text-xs text-muted-foreground shrink-0">
-          © {new Date().getFullYear()} MapChat
+          © {new Date().getFullYear()} Survey Agent
         </footer>
       </div>
     </PageTransition>
