@@ -11,7 +11,7 @@ import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 import { parseComplexSpatialQuery, parseMultiTargetQuery, parseAnyMultiLocationQuery } from '@/utils/mapUtils';
 import { setupDebugEventListener, verifyEventCreation } from '@/utils/debugUtils';
 
-export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
+export type LocationSourceTarget = 'property' | 'fedex' | 'starbucks';
 
 export interface LocationQuery {
   source: LocationSourceTarget;
