@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -116,10 +117,13 @@ interface MapProps {
 type LocationType = 'fedex' | 'property' | 'starbucks';
 
 // Update the LocationQuery interface to include complexSpatialQuery
+interface LocationQueryExtension {
+  complexSpatialQuery?: string;
+}
+
+// Extend the LocationQuery interface from './Chatbot'
 declare module './Chatbot' {
-  interface LocationQuery {
-    complexSpatialQuery?: string;
-  }
+  interface LocationQuery extends LocationQueryExtension {}
 }
 
 const Map: React.FC<MapProps> = ({ className = '' }) => {
@@ -653,7 +657,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           addFilteredLocations(resultLocations, 'property', '#3366cc', '#ffffff');
           
           // Add markers for the included location type (what properties should be near)
-          const uniqueIncludeLocationsMap = new Map();
+          const uniqueIncludeLocationsMap = new Map<string, LocationWithCoordinates>();
           
           includeConnections.forEach(conn => {
             const targetLoc = includeLocations.find(loc => {
@@ -668,11 +672,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           });
           
           // Convert map values to array
-          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values()) as LocationWithCoordinates[];
+          const includeLocsToShow = Array.from(uniqueIncludeLocationsMap.values());
           
           if (includeLocsToShow.length > 0) {
             addFilteredLocations(
-              includeLocsToShow,
+              includeLocsToShow as LocationWithCoordinates[],
               parsedQuery.includeType,
               parsedQuery.includeType === 'fedex' ? '#FF6600' : '#00704A',
               '#ffffff'
@@ -864,7 +868,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
               // Convert map values to array
               const fedExLocsToShow = Array.from(uniqueFedExLocationsMap.values());
               if (fedExLocsToShow.length > 0) {
-                addFilteredLocations(fedExLocsToShow, 'fedex', '#FF6600', '#ffffff');
+                addFilteredLocations(fedExLocsToShow as LocationWithCoordinates[], 'fedex', '#FF6600', '#ffffff');
               }
             }
             
@@ -889,7 +893,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
               
               if (starbucksToShow.length > 0) {
                 addFilteredLocations(
-                  starbucksToShow, 
+                  starbucksToShow as LocationWithCoordinates[], 
                   'starbucks',
                   '#00704A',
                   '#ffffff'
@@ -1034,11 +1038,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
           });
           
           // Convert to array and add markers
-          const locationsToShow: LocationWithCoordinates[] = Array.from(uniqueLocationsMap.values());
+          const locationsToShow = Array.from(uniqueLocationsMap.values());
           
           if (locationsToShow.length > 0) {
             addFilteredLocations(
-              locationsToShow, 
+              locationsToShow as LocationWithCoordinates[], 
               currentType,
               currentType === 'fedex' ? '#FF6600' : 
                 currentType === 'starbucks' ? '#00704A' : '#3366cc',

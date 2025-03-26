@@ -16,26 +16,26 @@ const Index = () => {
     setupDebugEventListener(MULTI_TARGET_QUERY_EVENT);
     setupDebugEventListener(DYNAMIC_QUERY_EVENT);
     
-    const handleLocationQuery = (e: any) => {
+    const handleLocationQuery = (e: CustomEvent) => {
       console.log("Index page received location query event:", e.detail);
     };
     
-    const handleComplexQuery = (e: any) => {
+    const handleComplexQuery = (e: CustomEvent) => {
       console.log("Index page received complex query event:", e.detail);
     };
     
-    const handleMultiTargetQuery = (e: any) => {
+    const handleMultiTargetQuery = (e: CustomEvent) => {
       console.log("Index page received multi-target query event:", e.detail);
     };
     
-    const handleDynamicQuery = (e: any) => {
+    const handleDynamicQuery = (e: CustomEvent) => {
       console.log("Index page received dynamic query event:", e.detail);
     };
     
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
-    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
-    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
-    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
+    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
+    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
     
     // Enhanced global error handling for event-related issues
     window.addEventListener('error', (e) => {
@@ -43,10 +43,10 @@ const Index = () => {
     });
     
     return () => {
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
-      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
-      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
-      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
+      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
+      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
+      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery as EventListener);
+      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery as EventListener);
     };
   }, []);
 
