@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button"
@@ -162,8 +161,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
     setMessages(prevMessages => [...prevMessages, processingMessage]);
 
     if (locationQuery) {
-      // Explicitly emit the location query event
-      emitLocationQuery(locationQuery);
+      // Log the query details before dispatching the event
+      console.log("About to emit location query event with details:", JSON.stringify(locationQuery));
+      
+      // Create and dispatch the custom event with proper detail
+      const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
+        detail: locationQuery,
+        bubbles: true,
+        cancelable: true
+      });
+      
+      // Explicitly dispatch event from window
+      window.dispatchEvent(event);
+      console.log("Location query event dispatched");
       
       // Convert messages to format expected by AI service
       const messageHistory: ChatMessageData[] = messages
