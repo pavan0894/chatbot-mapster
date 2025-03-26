@@ -367,14 +367,29 @@ export function findPropertiesWithMultiTargetProximity(
 
   // Start with all properties
   resultProperties = [...properties];
+  
+  console.log(`Starting with ${resultProperties.length} total properties`);
+  console.log(`Filtering for ${targetTypes.length} target types:`, targetTypes.map(t => `${t.type} (${t.radius} miles)`).join(', '));
 
   // Filter properties that match ALL target proximity criteria
   targetTypes.forEach(targetData => {
     const { type, locations, radius } = targetData;
+    console.log(`Processing ${type} locations (${locations.length} locations, radius: ${radius} miles)`);
     
     // Keep only properties that are within radius of at least one location of this type
-    resultProperties = resultProperties.filter(property => {
+    const matchingProperties: LocationWithCoordinates[] = [];
+    const typeConnections: Array<{ 
+      source: [number, number]; 
+      target: [number, number]; 
+      targetType: LocationSourceTarget;
+      distance: number 
+    }> = [];
+    
+    resultProperties.forEach(property => {
       const propertyCoords = getCoordinates(property);
+      let isWithinRadius = false;
+      let closestDistance = Number.MAX_VALUE;
+      let closestLocation: [number, number] | null = null;
       
       // Check if the property is within radius of any location of this type
       for (const location of locations) {
@@ -387,19 +402,30 @@ export function findPropertiesWithMultiTargetProximity(
         );
         
         if (distance <= radius) {
-          // Add connection for visualization
-          connections.push({
-            source: propertyCoords,
-            target: locationCoords,
-            targetType: type,
-            distance
-          });
-          return true; // This property is within radius of at least one location of this type
+          isWithinRadius = true;
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestLocation = locationCoords;
+          }
         }
       }
       
-      return false; // Property is not within radius of any location of this type
+      if (isWithinRadius && closestLocation) {
+        matchingProperties.push(property);
+        typeConnections.push({
+          source: propertyCoords,
+          target: closestLocation,
+          targetType: type,
+          distance: closestDistance
+        });
+      }
     });
+    
+    // Update result properties to only include those that match this criteria
+    resultProperties = matchingProperties;
+    connections.push(...typeConnections);
+    
+    console.log(`After filtering for ${type}: ${resultProperties.length} properties remain`);
   });
 
   return {
@@ -427,43 +453,98 @@ export function parseMultiTargetQuery(query: string): {
     return null;
   }
   
-  // Check for phrases indicating multi-target search
+  // Improved patterns for multi-target search detection
   const multiTargetPatterns = [
+    // Pattern for "within X miles of A and Y miles of B"
     /within\s+(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)(?:.*?)(?:and|&)\s*(?:within)?\s*(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)/i,
+    
+    // Pattern for "X miles of A and Y miles of B" without "within"
     /(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)(?:.*?)(?:and|&)\s*(?:within)?\s*(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)/i,
-    /near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?(?:.*?)(?:and|&)(?:.*?)near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?/i
+    
+    // Pattern for "near A within X miles and near B within Y miles"
+    /near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?(?:.*?)(?:and|&)(?:.*?)near\s*(\w+)(?:.*?)(?:within)?\s*(\d+)\s*miles?/i,
+    
+    // NEW: Pattern for simpler "properties within X miles of A and B"
+    /propert(?:y|ies)(?:.*?)within\s+(\d+)\s*miles?\s*(?:of|from|to)\s*(\w+)\s*and\s*(\w+)/i,
+    
+    // NEW: Pattern for even simpler mentions of two location types with properties
+    /propert(?:y|ies)(?:.*?)(?:near|close to|around|by)\s*(?:both)?\s*(\w+)\s*and\s*(\w+)/i
   ];
   
+  // Check all patterns for a match
   for (const pattern of multiTargetPatterns) {
     const match = queryLower.match(pattern);
     if (match) {
-      const targetTypes = [];
-      
-      // Pattern 1 & 2: within X miles of A and Y miles of B
-      if (match[1] && match[2] && match[3] && match[4]) {
+      // Handle different pattern matches differently
+      if (match.length >= 5 && match[1] && match[2] && match[3] && match[4]) {
+        // First three patterns with explicit distances
         const type1 = normalizeLocationType(match[2]);
         const radius1 = parseInt(match[1], 10);
         const type2 = normalizeLocationType(match[4]); 
         const radius2 = parseInt(match[3], 10);
         
         if (type1 && type2) {
-          targetTypes.push({ type: type1, radius: radius1 });
-          targetTypes.push({ type: type2, radius: radius2 });
-          return { targetTypes };
+          return { 
+            targetTypes: [
+              { type: type1, radius: radius1 },
+              { type: type2, radius: radius2 }
+            ] 
+          };
+        }
+      } else if (match.length >= 4 && match[1] && match[2] && match[3]) {
+        // Pattern for "properties within X miles of A and B"
+        const radius = parseInt(match[1], 10);
+        const type1 = normalizeLocationType(match[2]);
+        const type2 = normalizeLocationType(match[3]);
+        
+        if (type1 && type2) {
+          return { 
+            targetTypes: [
+              { type: type1, radius },
+              { type: type2, radius }
+            ] 
+          };
+        }
+      } else if (match.length >= 3 && match[1] && match[2]) {
+        // Simplest pattern with just mentions of locations
+        const type1 = normalizeLocationType(match[1]);
+        const type2 = normalizeLocationType(match[2]);
+        
+        if (type1 && type2) {
+          // Default radius when not specified
+          const defaultRadius = 5;
+          return { 
+            targetTypes: [
+              { type: type1, radius: defaultRadius },
+              { type: type2, radius: defaultRadius }
+            ] 
+          };
         }
       }
     }
   }
   
-  // Simpler pattern matching approach as fallback
+  // Direct extraction approach for FedEx and Starbucks
   const fedexRadius = extractRadiusForType(queryLower, 'fedex');
   const starbucksRadius = extractRadiusForType(queryLower, 'starbucks');
   
   if (fedexRadius > 0 && starbucksRadius > 0) {
+    console.log(`Detected multi-target query: FedEx (${fedexRadius} miles) and Starbucks (${starbucksRadius} miles)`);
     return {
       targetTypes: [
         { type: 'fedex' as LocationSourceTarget, radius: fedexRadius },
         { type: 'starbucks' as LocationSourceTarget, radius: starbucksRadius }
+      ]
+    };
+  }
+  
+  // If both location types are mentioned but no radius is specified, use default
+  if (queryLower.includes('fedex') && queryLower.includes('starbucks') && queryLower.includes('propert')) {
+    console.log('Detected multi-target query with default radii');
+    return {
+      targetTypes: [
+        { type: 'fedex' as LocationSourceTarget, radius: 5 },
+        { type: 'starbucks' as LocationSourceTarget, radius: 5 }
       ]
     };
   }
@@ -474,9 +555,20 @@ export function parseMultiTargetQuery(query: string): {
 // Helper function to extract radius for a specific location type
 function extractRadiusForType(query: string, type: string): number {
   const patterns = [
+    // "X miles of type"
     new RegExp(`(\\d+)\\s*miles?\\s*(?:of|from|to)\\s*${type}`, 'i'),
+    
+    // "type within X miles"
     new RegExp(`${type}\\s*(?:within|in)\\s*(\\d+)\\s*miles?`, 'i'),
-    new RegExp(`near\\s*${type}\\s*(?:within|in)\\s*(\\d+)\\s*miles?`, 'i')
+    
+    // "near type within X miles"
+    new RegExp(`near\\s*${type}\\s*(?:within|in)\\s*(\\d+)\\s*miles?`, 'i'),
+    
+    // "within X miles (of|from|to) type"
+    new RegExp(`within\\s*(\\d+)\\s*miles?\\s*(?:of|from|to)\\s*${type}`, 'i'),
+    
+    // NEW: "properties within X miles of type"
+    new RegExp(`propert(?:y|ies)\\s*(?:within|in)\\s*(\\d+)\\s*miles?\\s*(?:of|from|to)\\s*${type}`, 'i')
   ];
   
   for (const pattern of patterns) {
