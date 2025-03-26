@@ -33,30 +33,49 @@ function isLocationQuery(message: string): LocationQuery | null {
   const hasFedEx = message.includes('fedex');
   const hasProperty = message.includes('property') || message.includes('industrial') || message.includes('warehouse');
   
-  // If no location types are mentioned, return null
-  if (!hasFedEx && !hasProperty) {
-    return null;
-  }
-  
-  // Determine radius (default to 5 miles)
-  let radius = 5;
-  const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
-  if (radiusMatch) {
-    radius = parseInt(radiusMatch[1], 10);
-  }
-  
-  // Simple queries for showing all locations of a type
-  if (message.match(/show\s+(?:all\s+)?fedex/i) || message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i)) {
+  // If no location types are mentioned but asking about fedex, return fedex source
+  if (hasFedEx && !hasProperty) {
+    // Determine radius (default to 5 miles)
+    let radius = 5;
+    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
+    if (radiusMatch) {
+      radius = parseInt(radiusMatch[1], 10);
+    }
+    
     return { source: 'fedex' as LocationSourceTarget, radius };
   }
   
-  if (message.match(/show\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i) || 
-      message.match(/where\s+(?:are|is)\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i)) {
+  // If no FedEx mentioned but properties are, return property source
+  if (!hasFedEx && hasProperty) {
+    // Determine radius (default to 5 miles)
+    let radius = 5;
+    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
+    if (radiusMatch) {
+      radius = parseInt(radiusMatch[1], 10);
+    }
+    
     return { source: 'property' as LocationSourceTarget, radius };
   }
   
-  // Analyze for relationship queries
+  // If both are mentioned, determine relationship
   if (hasFedEx && hasProperty) {
+    // Determine radius (default to 5 miles)
+    let radius = 5;
+    const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
+    if (radiusMatch) {
+      radius = parseInt(radiusMatch[1], 10);
+    }
+    
+    // Simple queries for showing all locations of a type
+    if (message.match(/show\s+(?:all\s+)?fedex/i) || message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i)) {
+      return { source: 'fedex' as LocationSourceTarget, radius };
+    }
+    
+    if (message.match(/show\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i) || 
+        message.match(/where\s+(?:are|is)\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i)) {
+      return { source: 'property' as LocationSourceTarget, radius };
+    }
+    
     // Determine if FedEx is the source or target
     if ((message.includes('fedex near') || message.includes('fedex close to') || 
         message.includes('fedex within') || message.includes('fedex around')) && hasProperty) {
@@ -82,15 +101,6 @@ function isLocationQuery(message: string): LocationQuery | null {
         radius
       };
     }
-  }
-  
-  // If we've detected only one location type, make it the source
-  if (hasFedEx) {
-    return { source: 'fedex' as LocationSourceTarget, radius };
-  }
-  
-  if (hasProperty) {
-    return { source: 'property' as LocationSourceTarget, radius };
   }
   
   return null;
