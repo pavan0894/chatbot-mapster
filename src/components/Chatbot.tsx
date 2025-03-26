@@ -228,7 +228,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
   useEffect(() => {
     const welcomeMessage: MessageType = {
       id: 'welcome',
-      text: "Welcome to MapChat! I can help you find FedEx locations and industrial properties. Try asking questions like:\n\n- Show me all FedEx locations\n- Where are industrial properties in Dallas?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
+      text: "Welcome to SurveyAgent! I can help you find POIs such as FedEx locations and industrial properties. Try asking questions like:\n\n- Show me all FedEx locations\n- Show me industrial properties in Dallas Area?\n- Show properties within 3 miles of FedEx locations\n- Which FedEx locations are near warehouses?",
       sender: 'bot',
       timestamp: new Date()
     };
@@ -421,7 +421,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
             <Input
               id="chat-input"
               type="text"
-              placeholder="Ask me about locations..."
+              placeholder="Ask me about properties..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
