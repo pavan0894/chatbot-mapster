@@ -1,479 +1,165 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { SendIcon, Loader2 } from 'lucide-react';
-import ChatMessage, { MessageType } from './ChatMessage';
+import React, { useState, useCallback, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { getAIResponse, ChatMessageData, generateSuggestedQuestions } from '@/services/openaiService';
-import { toast } from 'sonner';
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useToast } from "@/components/ui/use-toast"
+
+export type LocationSourceTarget = 'fedex' | 'property';
+
+export interface LocationQuery {
+  source: LocationSourceTarget;
+  target?: LocationSourceTarget;
+  radius: number;
+}
+
+export const LOCATION_QUERY_EVENT = 'location-query';
+
+// Emit a location query event
+export function emitLocationQuery(query: LocationQuery) {
+  const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
+  window.dispatchEvent(event);
+}
+
+// Function to determine if a message is a location query
+function isLocationQuery(message: string): LocationQuery | null {
+  message = message.toLowerCase();
+  
+  // Check for fedex and property mentions
+  const hasFedEx = message.includes('fedex');
+  const hasProperty = message.includes('property') || message.includes('industrial') || message.includes('warehouse');
+  
+  // If no location types are mentioned, return null
+  if (!hasFedEx && !hasProperty) {
+    return null;
+  }
+  
+  // Determine radius (default to 5 miles)
+  let radius = 5;
+  const radiusMatch = message.match(/(\d+)(?:\s+)?(?:mile|mi|miles)/i);
+  if (radiusMatch) {
+    radius = parseInt(radiusMatch[1], 10);
+  }
+  
+  // Simple queries for showing all locations of a type
+  if (message.match(/show\s+(?:all\s+)?fedex/i) || message.match(/where\s+(?:are|is)\s+(?:all\s+)?fedex/i)) {
+    return { source: 'fedex' as LocationSourceTarget, radius };
+  }
+  
+  if (message.match(/show\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i) || 
+      message.match(/where\s+(?:are|is)\s+(?:all\s+)?(?:properties|property|industrial|warehouses)/i)) {
+    return { source: 'property' as LocationSourceTarget, radius };
+  }
+  
+  // Analyze for relationship queries
+  if (hasFedEx && hasProperty) {
+    // Determine if FedEx is the source or target
+    if (message.includes('fedex near') || message.includes('fedex close to') || 
+        message.includes('fedex within') || message.includes('fedex around')) {
+      return {
+        source: 'fedex' as LocationSourceTarget,
+        target: 'property' as LocationSourceTarget,
+        radius
+      };
+    } else {
+      return {
+        source: 'property' as LocationSourceTarget,
+        target: 'fedex' as LocationSourceTarget,
+        radius
+      };
+    }
+  }
+  
+  // If we've detected only one location type, make it the source
+  if (hasFedEx) {
+    return { source: 'fedex' as LocationSourceTarget, radius };
+  }
+  
+  if (hasProperty) {
+    return { source: 'property' as LocationSourceTarget, radius };
+  }
+  
+  return null;
+}
 
 interface ChatbotProps {
   className?: string;
 }
 
-// Define a union type for location sources/targets to avoid comparison errors
-export type LocationSourceTarget = 'fedex' | 'property' | 'starbucks';
-
-export interface LocationQuery {
-  type: 'location_search';
-  source: LocationSourceTarget;
-  target?: LocationSourceTarget;
-  radius: number;
-  targetLocation?: [number, number]; // [longitude, latitude]
-}
-
-// Define a custom event for location queries
-export const LOCATION_QUERY_EVENT = 'location-query-event';
-
-const initialMessages: MessageType[] = [
-  {
-    id: '1',
-    text: "Hello! I'm your map assistant. Ask me anything about locations, directions, or places you'd like to explore.",
-    sender: 'bot',
-    timestamp: new Date(),
-  },
-];
-
 const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
-  const [messages, setMessages] = useState<MessageType[]>(initialMessages);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [messages, setMessages] = useState<string[]>([]);
+  const [input, setInput] = useState<string>('');
+  const { toast } = useToast();
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const sendMessage = useCallback(() => {
+    if (!input.trim()) return;
+
+    // Add user message
+    setMessages(prevMessages => [...prevMessages, `You: ${input}`]);
+
+    // Check if the message is a location query
+    const locationQuery = isLocationQuery(input);
+
+    if (locationQuery) {
+      // Emit the location query event
+      emitLocationQuery(locationQuery);
+      setMessages(prevMessages => [...prevMessages, `MapChat: Searching for locations...`]);
+    } else {
+      // Handle non-location query messages
+      setMessages(prevMessages => [...prevMessages, `MapChat: I can only help with location-based questions about properties and FedEx locations.`]);
+    }
+
+    // Clear input
+    setInput('');
+  }, [input, setMessages, toast]);
+
+  // Handle Enter key press
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      sendMessage();
+    }
   };
 
+  // Auto-focus on the input field on component mount
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    // Focus the input on component mount
-    inputRef.current?.focus();
-    
-    // Generate initial suggested questions
-    setSuggestedQuestions(generateSuggestedQuestions().slice(0, 3));
+    const inputElement = document.getElementById('chat-input');
+    if (inputElement) {
+      inputElement.focus();
+    }
   }, []);
 
-  const getMessageHistory = (): ChatMessageData[] => {
-    return messages.map(msg => ({
-      role: msg.sender === 'bot' ? 'assistant' as const : 'user' as const,
-      content: msg.text
-    }));
-  };
-
-  const isLocationQuery = (message: string): LocationQuery | null => {
-    const lowerMsg = message.toLowerCase();
-    
-    if (
-      (lowerMsg.includes('properties') || lowerMsg.includes('property')) && 
-      lowerMsg.includes('fedex') && 
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
-    ) {
-      let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
-      if (radiusMatch) {
-        radius = parseInt(radiusMatch[1]);
-      }
-      
-      return {
-        type: 'location_search',
-        source: 'fedex' as LocationSourceTarget,
-        target: 'property' as LocationSourceTarget,
-        radius: radius
-      };
-    }
-    
-    if (
-      lowerMsg.includes('fedex') && 
-      (
-        (lowerMsg.includes('properties') || lowerMsg.includes('property')) || 
-        lowerMsg.includes('industrial') || 
-        lowerMsg.includes('warehouse') || 
-        lowerMsg.includes('distribution')
-      ) && 
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
-    ) {
-      let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
-      if (radiusMatch) {
-        radius = parseInt(radiusMatch[1]);
-      }
-      
-      return {
-        type: 'location_search',
-        source: 'property' as LocationSourceTarget,
-        target: 'fedex' as LocationSourceTarget,
-        radius: radius
-      };
-    }
-    
-    if (
-      lowerMsg.includes('starbucks') &&
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
-    ) {
-      let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi)/);
-      if (radiusMatch) {
-        radius = parseInt(radiusMatch[1]);
-      }
-      
-      const source: LocationSourceTarget = 'starbucks';
-      let target: LocationSourceTarget | undefined = 'property';
-      
-      if (lowerMsg.includes('fedex')) {
-        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'fedex' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'fedex' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        }
-      } else if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
-        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'property' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'property' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        }
-      }
-      
-      return {
-        type: 'location_search',
-        source,
-        target,
-        radius
-      };
-    }
-    
-    if (
-      (lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('fedex')) &&
-      lowerMsg.includes('starbucks') &&
-      (lowerMsg.includes('near') || lowerMsg.includes('close') || lowerMsg.includes('around') || lowerMsg.includes('radius') || lowerMsg.includes('within') || lowerMsg.includes('miles'))
-    ) {
-      let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi|radius)/);
-      if (radiusMatch) {
-        radius = parseInt(radiusMatch[1]);
-      }
-      
-      if (lowerMsg.includes('fedex')) {
-        if (lowerMsg.indexOf('fedex') < lowerMsg.indexOf('starbucks')) {
-          return {
-            type: 'location_search',
-            source: 'fedex' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'fedex' as LocationSourceTarget,
-            radius
-          };
-        }
-      } else {
-        if (lowerMsg.indexOf('propert') < lowerMsg.indexOf('starbucks')) {
-          return {
-            type: 'location_search',
-            source: 'property' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'property' as LocationSourceTarget,
-            radius
-          };
-        }
-      }
-    }
-    
-    if (
-      (lowerMsg.includes('fedex') || lowerMsg.includes('properties') || lowerMsg.includes('property') || lowerMsg.includes('starbucks')) &&
-      (lowerMsg.includes('mile') || lowerMsg.includes('miles') || lowerMsg.includes('radius'))
-    ) {
-      let radius = 3; // Default radius in miles
-      const radiusMatch = lowerMsg.match(/(\d+)\s*(mile|miles|mi|radius)/);
-      if (radiusMatch) {
-        radius = parseInt(radiusMatch[1]);
-      }
-      
-      let source: LocationSourceTarget = 'property';
-      let target: LocationSourceTarget | undefined;
-      
-      if (lowerMsg.includes('starbucks') && lowerMsg.includes('fedex')) {
-        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('fedex')) {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'fedex' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'fedex' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        }
-      } else if (lowerMsg.includes('starbucks') && (lowerMsg.includes('property') || lowerMsg.includes('properties'))) {
-        if (lowerMsg.indexOf('starbucks') < lowerMsg.indexOf('propert')) {
-          return {
-            type: 'location_search',
-            source: 'starbucks' as LocationSourceTarget,
-            target: 'property' as LocationSourceTarget,
-            radius
-          };
-        } else {
-          return {
-            type: 'location_search',
-            source: 'property' as LocationSourceTarget,
-            target: 'starbucks' as LocationSourceTarget,
-            radius
-          };
-        }
-      } else if (lowerMsg.includes('fedex')) {
-        source = 'fedex';
-        if (lowerMsg.includes('property') || lowerMsg.includes('properties')) {
-          target = 'property';
-        }
-      } else if (lowerMsg.includes('starbucks')) {
-        source = 'starbucks';
-      }
-      
-      return {
-        type: 'location_search',
-        source,
-        target,
-        radius
-      };
-    }
-    
-    if (lowerMsg.includes('starbucks') && 
-        (lowerMsg.includes('show') || lowerMsg.includes('display') || lowerMsg.includes('where') || 
-         lowerMsg.includes('find') || lowerMsg.includes('locate') || lowerMsg.includes('search'))) {
-      return {
-        type: 'location_search',
-        source: 'starbucks' as LocationSourceTarget,
-        radius: 10 // Larger default radius for general searches
-      };
-    }
-    
-    return null;
-  };
-
-  const handleLocationQuery = (locationQuery: LocationQuery) => {
-    const locationEvent = new CustomEvent(LOCATION_QUERY_EVENT, { 
-      detail: locationQuery 
-    });
-    window.dispatchEvent(locationEvent);
-    
-    let responseText = '';
-    
-    if (locationQuery.target) {
-      responseText = `Showing ${locationQuery.target === 'fedex' ? 'FedEx locations' : 
-                     locationQuery.target === 'starbucks' ? 'Starbucks locations' : 
-                     'industrial properties'} within ${locationQuery.radius} miles of ${
-                     locationQuery.source === 'fedex' ? 'FedEx locations' : 
-                     locationQuery.source === 'starbucks' ? 'Starbucks locations' : 
-                     'industrial properties'} on the map.`;
-    } else {
-      if (locationQuery.source === 'starbucks') {
-        responseText = `Showing all Starbucks locations on the map.`;
-      } else {
-        responseText = `Showing ${locationQuery.source === 'fedex' ? 'FedEx locations' : 
-                       locationQuery.source === 'starbucks' ? 'Starbucks locations' : 
-                       'industrial properties'} within ${locationQuery.radius} miles on the map.`;
-      }
-    }
-    
-    const botMessage: MessageType = {
-      id: Date.now().toString(),
-      text: responseText,
-      sender: 'bot',
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, botMessage]);
-    setIsLoading(false);
-    
-    const updatedHistory = [
-      ...getMessageHistory(),
-      { role: 'assistant' as const, content: responseText }
-    ];
-    setSuggestedQuestions(generateSuggestedQuestions(updatedHistory).slice(0, 3));
-  };
-
-  const handleSuggestedQuestionClick = (question: string) => {
-    const userMessage: MessageType = {
-      id: Date.now().toString(),
-      text: question,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    
-    processMessage(question);
-  };
-
-  const processMessage = async (message: string) => {
-    try {
-      const locationQuery = isLocationQuery(message);
-      
-      if (locationQuery) {
-        handleLocationQuery(locationQuery);
-      } else {
-        const aiMessages: ChatMessageData[] = getMessageHistory()
-          .concat({
-            role: 'user' as const,
-            content: message
-          });
-        
-        const response = await getAIResponse(aiMessages);
-        
-        if (response.error) {
-          toast.error(response.error);
-          setIsLoading(false);
-          return;
-        }
-        
-        const botMessage: MessageType = {
-          id: Date.now().toString(),
-          text: response.text,
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        
-        setMessages(prev => [...prev, botMessage]);
-        setIsLoading(false);
-        
-        const updatedHistory = [
-          ...aiMessages,
-          { role: 'assistant' as const, content: response.text }
-        ];
-        setSuggestedQuestions(generateSuggestedQuestions(updatedHistory).slice(0, 3));
-      }
-    } catch (error) {
-      console.error("Error in chat:", error);
-      toast.error("Something went wrong. Please try again.");
-      setIsLoading(false);
-    }
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputValue.trim() || isLoading) return;
-    
-    const userMessage: MessageType = {
-      id: Date.now().toString(),
-      text: inputValue,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsLoading(true);
-    
-    await processMessage(inputValue);
-  };
-
   return (
-    <div className={cn("flex flex-col h-full bg-background/80 backdrop-blur-sm", className)}>
-      <div className="p-3 border-b border-border">
-        <h2 className="text-lg font-medium">Chat Assistant</h2>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map(message => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
-        {isLoading && (
-          <div className="flex items-center space-x-2 animate-fade-in">
-            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-medium text-primary">AI</span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>Thinking...</span>
-            </div>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      
-      {!isLoading && suggestedQuestions.length > 0 && (
-        <div className="px-3 py-2 border-t border-border bg-muted/30">
-          <p className="text-xs text-muted-foreground mb-2">Suggested questions:</p>
-          <div className="flex flex-wrap gap-2">
-            {suggestedQuestions.map((question, index) => (
-              <button
-                key={index}
-                onClick={() => handleSuggestedQuestionClick(question)}
-                className="text-xs bg-background/50 hover:bg-background border border-border rounded-full px-3 py-1 text-foreground/70 hover:text-foreground transition-colors"
-              >
-                {question.length > 60 ? `${question.substring(0, 57)}...` : question}
-              </button>
+    <Card className={cn("w-full h-full rounded-none", className)}>
+      <CardContent className="flex flex-col h-full p-0">
+        {/* Chat Messages */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="flex flex-col space-y-2">
+            {messages.map((message, index) => (
+              <p key={index} className="text-sm">
+                {message}
+              </p>
             ))}
           </div>
+        </ScrollArea>
+
+        {/* Input Area */}
+        <div className="p-4 border-t border-border">
+          <div className="flex items-center space-x-2">
+            <Input
+              id="chat-input"
+              type="text"
+              placeholder="Ask me about locations..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="flex-1"
+            />
+            <Button onClick={sendMessage}>Send</Button>
+          </div>
         </div>
-      )}
-      
-      <form onSubmit={handleSendMessage} className="p-3 border-t border-border bg-background/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type your message..."
-            className="flex-1 bg-transparent py-2 px-3 rounded-full border border-border focus:border-primary/30 focus:ring-0 outline-none transition-colors text-sm"
-            disabled={isLoading}
-          />
-          <button
-            type="submit"
-            className={cn(
-              "w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center transition-colors",
-              (isLoading || !inputValue.trim()) ? "opacity-50 cursor-not-allowed" : "hover:bg-primary/90 focus:bg-primary/90"
-            )}
-            disabled={isLoading || !inputValue.trim()}
-          >
-            {isLoading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <SendIcon size={18} />
-            )}
-          </button>
-        </div>
-      </form>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 
