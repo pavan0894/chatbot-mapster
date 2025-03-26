@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -702,7 +701,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         const fedExTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'fedex');
         if (fedExTarget) {
           targetData.push({
-            type: 'fedex' as const,
+            type: 'fedex' as LocationSourceTarget,
             locations: loadFedExLocations(),
             radius: fedExTarget.radius
           });
@@ -712,7 +711,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         const starbucksTarget = query.multiTargetQuery.targetTypes.find(t => t.type === 'starbucks');
         if (starbucksTarget) {
           targetData.push({
-            type: 'starbucks' as const,
+            type: 'starbucks' as LocationSourceTarget,
             locations: STARBUCKS_LOCATIONS,
             radius: starbucksTarget.radius
           });
@@ -735,7 +734,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             if (fedExTarget) {
               const fedExConnections = connections.filter(c => c.targetType === 'fedex');
               // Create a map to track unique FedEx locations
-              const uniqueFedExLocationsMap = new Map<string, LocationWithCoordinates>();
+              const uniqueFedExLocationsMap = new Map();
               
               fedExConnections.forEach(conn => {
                 const fedLoc = fedExLocations.find(f => 
@@ -758,7 +757,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             if (starbucksTarget) {
               const starbucksConnections = connections.filter(c => c.targetType === 'starbucks');
               // Create a map to track unique Starbucks locations
-              const uniqueStarbucksLocationsMap = new Map<string, LocationWithCoordinates>();
+              const uniqueStarbucksLocationsMap = new Map();
               
               starbucksConnections.forEach(conn => {
                 const sbLoc = STARBUCKS_LOCATIONS.find(s => 
@@ -790,7 +789,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             
             // Fit map to show all relevant locations
             const allCoordinates = [
-              ...resultProperties.map(loc => loc.coordinates as [number, number]),
+              ...resultProperties.map(loc => getCoordinates(loc)),
               ...connections.map(conn => conn.target)
             ];
             
@@ -895,7 +894,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         if (connectionsForType.length > 0) {
           // Extract unique target locations
-          const uniqueLocationsMap = new Map<string, LocationWithCoordinates>();
+          const uniqueLocationsMap = new Map();
           
           connectionsForType.forEach(conn => {
             const targetLoc = data.locations.find(loc => {
