@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { setOpenAIApiKey, hasValidApiKey } from '@/services/apiKeyService';
 
 export const ApiKeyInput: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>('');
@@ -12,8 +13,8 @@ export const ApiKeyInput: React.FC = () => {
 
   // Check if API key is already set
   useEffect(() => {
-    const storedKey = localStorage.getItem('openai_api_key');
-    setIsVisible(!storedKey);
+    const keyValid = hasValidApiKey();
+    setIsVisible(!keyValid);
   }, []);
 
   const handleSaveKey = () => {
@@ -26,15 +27,14 @@ export const ApiKeyInput: React.FC = () => {
       return;
     }
 
-    localStorage.setItem('openai_api_key', apiKey);
+    // Save API key to both localStorage and the service
+    setOpenAIApiKey(apiKey);
     setIsVisible(false);
+    
     toast({
       title: "Success",
       description: "API key saved successfully",
     });
-
-    // Set the key in the environment
-    window.setOpenAIKey?.(apiKey);
   };
 
   if (!isVisible) return null;
