@@ -3,7 +3,6 @@ import React, { useEffect } from 'react';
 import { Card } from "@/components/ui/card";
 import Chatbot from "@/components/Chatbot";
 import Map from "@/components/Map";
-import PropertyTable from "@/components/PropertyTable";
 import { setupDebugEventListener } from '@/utils/debugUtils';
 import { LOCATION_QUERY_EVENT, API_QUERY_EVENT, COMPLEX_QUERY_EVENT } from '@/components/Chatbot';
 
@@ -41,7 +40,6 @@ const Index = () => {
           <div className="flex-1 overflow-hidden">
             <Map />
           </div>
-          <PropertyTable className="h-auto max-h-[40%] overflow-auto" />
         </div>
       </div>
     </div>
