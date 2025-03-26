@@ -15,6 +15,7 @@ export interface LocationQuery {
   source: LocationSourceTarget;
   target?: LocationSourceTarget;
   radius: number;
+  isDallasQuery?: boolean; // Added field to track if this is a Dallas area query
 }
 
 export const LOCATION_QUERY_EVENT = 'location-query';
@@ -26,9 +27,24 @@ export function emitLocationQuery(query: LocationQuery) {
   window.dispatchEvent(event);
 }
 
-// Enhanced function to determine if a message is a location query with better FedEx detection
+// Enhanced function to determine if a message is a location query with better Dallas area detection
 function isLocationQuery(message: string): LocationQuery | null {
   message = message.toLowerCase();
+  
+  // Dallas area detection patterns
+  const dallasPatterns = [
+    /\bdallas\b/i,
+    /\bdallas\s+area\b/i,
+    /\bdallas\s+region\b/i,
+    /\bin\s+dallas\b/i,
+    /\bnear\s+dallas\b/i,
+    /\baround\s+dallas\b/i,
+    /\bdfw\b/i,
+    /\bdallas-fort\s+worth\b/i
+  ];
+  
+  // Check if message mentions Dallas area
+  const isDallasQuery = dallasPatterns.some(pattern => pattern.test(message));
   
   // More comprehensive FedEx detection patterns
   const fedExPatterns = [
@@ -75,6 +91,17 @@ function isLocationQuery(message: string): LocationQuery | null {
     /properties.+\?/i
   ];
   
+  // Check for show/display/where keywords that indicate a user wants to see something
+  const showPatterns = [
+    /\bshow\b/i,
+    /\bdisplay\b/i,
+    /\bwhere\b/i,
+    /\bfind\b/i,
+    /\blocate\b/i
+  ];
+  
+  const isShowingRequest = showPatterns.some(pattern => pattern.test(message));
+  
   // Check for FedEx mentions
   const hasFedEx = fedExPatterns.some(pattern => pattern.test(message));
   
@@ -94,16 +121,34 @@ function isLocationQuery(message: string): LocationQuery | null {
   // Check for distance/proximity terms
   const hasProximity = /near|close\s+to|within|around|nearby|proximity|closest|nearest/i.test(message);
   
+  // Special case for Dallas property queries
+  if (hasProperty && isDallasQuery && isShowingRequest) {
+    console.log("Detected request for properties in Dallas area");
+    return { 
+      source: 'property' as LocationSourceTarget, 
+      radius,
+      isDallasQuery: true 
+    };
+  }
+  
   // If explicitly asking for all FedEx locations
   if (hasFedEx && (askingForAll || !hasProximity) && !hasProperty) {
     console.log("Detected request for FedEx locations");
-    return { source: 'fedex' as LocationSourceTarget, radius };
+    return { 
+      source: 'fedex' as LocationSourceTarget, 
+      radius,
+      isDallasQuery 
+    };
   }
   
-  // If explicitly asking for all properties
+  // If explicitly asking for all properties (but not Dallas-specific)
   if (hasProperty && (askingForAll || !hasProximity) && !hasFedEx) {
     console.log("Detected request for property locations");
-    return { source: 'property' as LocationSourceTarget, radius };
+    return { 
+      source: 'property' as LocationSourceTarget, 
+      radius,
+      isDallasQuery 
+    };
   }
   
   // If both FedEx and properties are mentioned
@@ -122,14 +167,16 @@ function isLocationQuery(message: string): LocationQuery | null {
         return {
           source: 'fedex' as LocationSourceTarget,
           target: 'property' as LocationSourceTarget,
-          radius
+          radius,
+          isDallasQuery
         };
       } else if (propertyNearFedEx) {
         console.log("Detected request for properties near FedEx locations");
         return {
           source: 'property' as LocationSourceTarget,
           target: 'fedex' as LocationSourceTarget,
-          radius
+          radius,
+          isDallasQuery
         };
       }
     }
@@ -139,18 +186,27 @@ function isLocationQuery(message: string): LocationQuery | null {
     return {
       source: 'property' as LocationSourceTarget,
       target: 'fedex' as LocationSourceTarget,
-      radius
+      radius,
+      isDallasQuery
     };
   }
   
   // If no strong location query is detected but FedEx is mentioned, assume basic FedEx query
   if (hasFedEx) {
-    return { source: 'fedex' as LocationSourceTarget, radius };
+    return { 
+      source: 'fedex' as LocationSourceTarget, 
+      radius,
+      isDallasQuery
+    };
   }
   
   // If no strong location query is detected but property is mentioned, assume basic property query
   if (hasProperty) {
-    return { source: 'property' as LocationSourceTarget, radius };
+    return { 
+      source: 'property' as LocationSourceTarget, 
+      radius,
+      isDallasQuery
+    };
   }
   
   // If it's not a location query we recognize

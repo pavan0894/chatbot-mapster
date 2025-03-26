@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -138,7 +137,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         
         setMapInitialized(true);
         
-        resetMap();
+        // Initialize map but don't show any markers by default
+        // This is the change - no calling resetMap() here
       });
       
       const secondsPerRevolution = 240;
@@ -348,13 +348,26 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     clearAllMarkers();
     clearFilteredLocations();
     
+    // Check for Dallas-specific property queries
+    const isPropertyInDallas = 
+      query.source === 'property' && 
+      event.detail.isDallasQuery === true;
+    
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     
-    if (!isFedExQuery && query.source === 'property') {
-      console.log("Showing only property locations with no filtering");
+    // Show properties only if explicitly asked about Dallas properties
+    if (isPropertyInDallas) {
+      console.log("Showing Dallas property locations");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
       fitMapToLocations(INDUSTRIAL_PROPERTIES.map(loc => loc.coordinates as [number, number]));
       emitResultsUpdate(INDUSTRIAL_PROPERTIES);
+      return;
+    }
+    
+    // For non-Dallas property queries, don't show property pins automatically
+    if (!isFedExQuery && query.source === 'property' && !isPropertyInDallas) {
+      console.log("Non-Dallas property query, not showing property pins");
+      emitResultsUpdate([]);
       return;
     }
     
@@ -571,138 +584,4 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         'line-color': '#FF6600',
         'line-width': 2,
         'line-opacity': 0.7,
-        'line-dasharray': [2, 1]
-      }
-    });
-    
-    map.current.addLayer({
-      id: 'connections-labels',
-      type: 'symbol',
-      source: 'connections',
-      layout: {
-        'text-field': '{distance} mi',
-        'text-font': ['Open Sans Regular'],
-        'text-size': 12,
-        'text-offset': [0, -0.5],
-        'text-variable-anchor': ['top', 'bottom', 'left', 'right'],
-        'text-radial-offset': 0.6,
-        'text-justify': 'auto'
-      },
-      paint: {
-        'text-color': '#333',
-        'text-halo-color': '#fff',
-        'text-halo-width': 2
-      }
-    });
-    
-    setActiveLayers(['connections-layer', 'connections-labels']);
-  };
-
-  const fitMapToLocations = (coordinates: [number, number][]) => {
-    if (!map.current || !coordinates.length) {
-      console.error("Map not initialized or no coordinates when fitting map to locations");
-      return;
-    }
-    
-    const bounds = coordinates.reduce((bounds, coord) => {
-      return bounds.extend(coord);
-    }, new mapboxgl.LngLatBounds(coordinates[0], coordinates[0]));
-    
-    map.current.fitBounds(bounds, {
-      padding: 50,
-      maxZoom: 11
-    });
-  };
-
-  const clearAllMarkers = () => {
-    console.log("Clearing all markers, count:", activeMarkers.length);
-    activeMarkers.forEach(marker => marker.remove());
-    setActiveMarkers([]);
-    setDisplayedProperties([]);
-  };
-
-  const clearFilteredLocations = () => {
-    if (map.current) {
-      if (activeLayers.length > 0) {
-        activeLayers.forEach(layerId => {
-          if (map.current && map.current.getLayer(layerId)) {
-            map.current.removeLayer(layerId);
-          }
-        });
-        
-        if (map.current.getSource('connections')) {
-          map.current.removeSource('connections');
-        }
-      }
-    }
-    
-    setActiveLayers([]);
-  };
-
-  const resetMap = () => {
-    if (!map.current) return;
-    
-    console.log("Resetting map");
-    
-    clearAllMarkers();
-    clearFilteredLocations();
-    
-    map.current.flyTo({
-      center: [-96.7970, 32.7767],
-      zoom: 9,
-      pitch: 45,
-      bearing: 0
-    });
-    
-    addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
-    setDisplayedProperties(INDUSTRIAL_PROPERTIES);
-    emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-  };
-
-  useEffect(() => {
-    console.log("Setting up event listener for location queries");
-    
-    const handleLocationQueryTyped = (e: Event) => {
-      const customEvent = e as CustomEvent<LocationQuery>;
-      console.log("Received location query event:", customEvent.detail);
-      handleLocationQuery(customEvent);
-    };
-    
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
-    
-    return () => {
-      console.log("Cleaning up map component");
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQueryTyped);
-      if (map.current) {
-        map.current.remove();
-        map.current = null;
-      }
-      setMapInitialized(false);
-    };
-  }, []);
-
-  return (
-    <div className={`relative h-full w-full ${className}`}>
-      <div ref={mapContainer} className="absolute inset-0" />
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/10" />
-        <div className="absolute top-0 left-0 right-0 h-12 bg-gradient-to-b from-background/20 to-transparent" />
-      </div>
-      
-      <button 
-        onClick={resetMap}
-        className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur-sm text-foreground px-3 py-1.5 text-sm rounded-md shadow-md hover:bg-white flex items-center gap-1.5 transition-colors border border-border"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-          <path d="M3 3v5h5"/>
-          <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
-          <path d="M16 16h5v5"/>
-        </svg>
-        Reset Map
-      </button>
-    </div>
-  );
-};
-
-export default Map;
+        'line-dasharray
