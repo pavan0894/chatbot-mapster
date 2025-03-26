@@ -15,11 +15,8 @@ import {
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
-export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
-
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
 
-// Static fallback properties for complex spatial queries
 const COMPLEX_QUERY_FALLBACK_PROPERTIES: LocationWithCoordinates[] = [
   { 
     name: "Dallas Logistics Hub - FedEx Close", 
@@ -33,7 +30,6 @@ const COMPLEX_QUERY_FALLBACK_PROPERTIES: LocationWithCoordinates[] = [
   }
 ];
 
-// Static properties for industrial locations
 const INDUSTRIAL_PROPERTIES: LocationWithCoordinates[] = [
   { name: "Dallas Logistics Hub", coordinates: [-96.7559, 32.7323], description: "Major logistics facility" },
   { name: "Southport Logistics Park", coordinates: [-96.8512, 32.6891], description: "Modern warehouse complex" },
@@ -131,7 +127,6 @@ interface MapProps {
 
 type LocationType = 'fedex' | 'property' | 'starbucks';
 
-// Define the extension for LocationQuery to include complexSpatialQuery
 interface LocationQueryExtension {
   complexSpatialQuery?: {
     includeType: LocationSourceTarget;
@@ -155,7 +150,6 @@ interface LocationQueryExtension {
   };
 }
 
-// Extend the LocationQuery interface
 declare module './Chatbot' {
   interface LocationQuery extends LocationQueryExtension {}
 }
@@ -628,3 +622,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     coordinates.forEach(coord => bounds.extend(coord));
     
     map.current.fitBounds(bounds, {
+      padding: 50,
+      maxZoom: 12
+    });
+  };
+
+  return (
+    <div ref={mapContainer} className={`w-full h-full ${className}`} />
+  );
+};
+
+export default Map;
