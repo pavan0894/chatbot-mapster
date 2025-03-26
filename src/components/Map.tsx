@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -1011,7 +1010,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     setActiveLayers(prev => [...prev, 'connections-layer']);
   };
   
-  // New function to add connections to excluded locations with different style
   const addExcludeConnectionLines = (connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>) => {
     if (!map.current || connections.length === 0) return;
     
