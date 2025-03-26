@@ -273,8 +273,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     locations.forEach(location => {
       const el = document.createElement('div');
       el.className = 'fedex-marker';
-      el.style.width = '28px';
-      el.style.height = '28px';
+      el.style.width = '32px';
+      el.style.height = '32px';
       el.style.borderRadius = '50%';
       el.style.backgroundColor = '#FFFFFF';
       el.style.border = '2px solid #FF6600';
@@ -284,14 +284,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       el.style.alignItems = 'center';
       el.style.justifyContent = 'center';
       
-      // Add FedEx logo SVG
+      // Updated FedEx logo SVG to match official logo
       el.innerHTML = `
-        <svg width="22" height="22" viewBox="0 0 240 82" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M53.7998 0H77.9998V33.3L101.8 0H128.5L97.4998 41.4L129.6 82H102.6L77.9998 48.9V82H53.7998V0Z" fill="#4D148C"/>
-          <path d="M18.5 41.4H43.3V50.2H33.7V82H18.5V50.2H0V33.3C0 20.5 7.3 8.9 20 8.9H43.4V26.1H23.4C18.5 26.1 18.5 33.2 18.5 33.2V41.4Z" fill="#4D148C"/>
-          <path d="M129.6 41.4H188.3V26.1H144.7V17.5H188.3V0H129.6V41.4Z" fill="#4D148C"/>
-          <path d="M129.6 82H188.3V64.5H144.7V56H188.3V48.8H129.6V82Z" fill="#FF6600"/>
-          <path d="M206.3 0L181.6 33.3V0H196.8V33.3L221.5 0H240.0001L209.1 41.4L240.0001 82H221.5L196.8 48.9V82H181.6V48.9L157 82H138.4L169.3 41.4L138.4 0H206.3Z" fill="#FF6600"/>
+        <svg width="24" height="24" viewBox="0 0 960 282" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M364 156H273V107H364V156Z" fill="#FF5900"/>
+          <path d="M364 229H273V180H364V229Z" fill="#FF5900"/>
+          <path d="M720 229H629V156H720V229Z" fill="#FF5900"/>
+          <path d="M720 107H629V34H720V107Z" fill="#FF5900"/>
+          <path d="M273 34H53V229H149V180H273V229H438V34H273V107H149V34H273Z" fill="#4D148C"/>
+          <path d="M546 229H438V34H537V83H485V132H537V180H485V229H546Z" fill="#4D148C"/>
+          <path d="M629 34V107H582L629 34Z" fill="#FF5900"/>
+          <path d="M798 229H720V34H798L845 107V34H906V229H845V156L798 229Z" fill="#FF5900"/>
         </svg>
       `;
       
@@ -587,8 +590,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       if (locationType === 'fedex') {
         el = document.createElement('div');
         el.className = `${locationType}-marker-filtered`;
-        el.style.width = '28px';
-        el.style.height = '28px';
+        el.style.width = '32px';
+        el.style.height = '32px';
         el.style.borderRadius = '50%';
         el.style.backgroundColor = '#FFFFFF';
         el.style.border = '2px solid #FF6600';
@@ -598,14 +601,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
         el.style.alignItems = 'center';
         el.style.justifyContent = 'center';
         
-        // Add FedEx logo SVG
+        // Updated FedEx logo SVG to match official logo
         el.innerHTML = `
-          <svg width="22" height="22" viewBox="0 0 240 82" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M53.7998 0H77.9998V33.3L101.8 0H128.5L97.4998 41.4L129.6 82H102.6L77.9998 48.9V82H53.7998V0Z" fill="#4D148C"/>
-            <path d="M18.5 41.4H43.3V50.2H33.7V82H18.5V50.2H0V33.3C0 20.5 7.3 8.9 20 8.9H43.4V26.1H23.4C18.5 26.1 18.5 33.2 18.5 33.2V41.4Z" fill="#4D148C"/>
-            <path d="M129.6 41.4H188.3V26.1H144.7V17.5H188.3V0H129.6V41.4Z" fill="#4D148C"/>
-            <path d="M129.6 82H188.3V64.5H144.7V56H188.3V48.8H129.6V82Z" fill="#FF6600"/>
-            <path d="M206.3 0L181.6 33.3V0H196.8V33.3L221.5 0H240.0001L209.1 41.4L240.0001 82H221.5L196.8 48.9V82H181.6V48.9L157 82H138.4L169.3 41.4L138.4 0H206.3Z" fill="#FF6600"/>
+          <svg width="24" height="24" viewBox="0 0 960 282" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M364 156H273V107H364V156Z" fill="#FF5900"/>
+            <path d="M364 229H273V180H364V229Z" fill="#FF5900"/>
+            <path d="M720 229H629V156H720V229Z" fill="#FF5900"/>
+            <path d="M720 107H629V34H720V107Z" fill="#FF5900"/>
+            <path d="M273 34H53V229H149V180H273V229H438V34H273V107H149V34H273Z" fill="#4D148C"/>
+            <path d="M546 229H438V34H537V83H485V132H537V180H485V229H546Z" fill="#4D148C"/>
+            <path d="M629 34V107H582L629 34Z" fill="#FF5900"/>
+            <path d="M798 229H720V34H798L845 107V34H906V229H845V156L798 229Z" fill="#FF5900"/>
           </svg>
         `;
       } else if (locationType === 'starbucks') {
