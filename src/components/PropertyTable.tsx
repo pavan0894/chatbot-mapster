@@ -8,7 +8,8 @@ interface PropertyTableProps {
   className?: string;
 }
 
-const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
+// Make sure we're using the same event name as in the Map component
+export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
 
 const PropertyTable: React.FC<PropertyTableProps> = ({ className = '' }) => {
   const [properties, setProperties] = useState<LocationWithCoordinates[]>([]);
