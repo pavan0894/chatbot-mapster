@@ -206,45 +206,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     }
   }, [mapInitialized]);
 
-  const addIndustrialProperties = () => {
-    if (!map.current) {
-      console.error("Map not initialized when adding industrial properties");
-      return;
-    }
-    
-    console.log("Adding industrial properties markers");
-    const markers: mapboxgl.Marker[] = [];
-    
-    INDUSTRIAL_PROPERTIES.forEach(property => {
-      const el = document.createElement('div');
-      el.className = 'industrial-marker';
-      el.style.width = '24px';
-      el.style.height = '34px';
-      el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
-      el.style.backgroundSize = 'contain';
-      el.style.backgroundRepeat = 'no-repeat';
-      el.style.cursor = 'pointer';
-      
-      const popup = new mapboxgl.Popup({ offset: [0, -25] })
-        .setHTML(`
-          <h3 style="font-weight: bold; margin-bottom: 5px;">${property.name}</h3>
-          <p style="margin: 0;">${property.description}</p>
-        `);
-      
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(property.coordinates as [number, number])
-        .setPopup(popup)
-        .addTo(map.current);
-      
-      markers.push(marker);
-    });
-    
-    setActiveMarkers(prev => [...prev, ...markers]);
-    setDisplayedProperties(INDUSTRIAL_PROPERTIES);
-    
-    emitResultsUpdate(INDUSTRIAL_PROPERTIES);
-  };
-
   const loadFedExLocations = () => {
     if (fedExLoaded) {
       console.log("FedEx locations already loaded");
@@ -416,6 +377,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     const isFedExQuery = query.source === 'fedex' || query.target === 'fedex';
     const isStarbucksQuery = query.source === 'starbucks' || query.target === 'starbucks';
     
+    // For Dallas-specific property queries, ONLY show properties in Dallas area
     if (isPropertyInDallas) {
       console.log("Showing Dallas property locations");
       addFilteredLocations(INDUSTRIAL_PROPERTIES, 'property', '#333', '#fff');
@@ -430,6 +392,8 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
+    // For standalone property queries (not in Dallas) that don't include FedEx or Starbucks,
+    // don't show any property pins
     if (!isFedExQuery && !isStarbucksQuery && query.source === 'property' && !isPropertyInDallas) {
       console.log("Non-Dallas property query, not showing property pins");
       emitResultsUpdate([]);
@@ -475,6 +439,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       }
     }
     
+    // For standalone Starbucks queries, just show all Starbucks locations
     if (query.source === 'starbucks' && !query.target) {
       console.log("Showing only Starbucks locations with no filtering");
       const starbucksLocations = addStarbucksLocations();
@@ -489,6 +454,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
+    // For standalone FedEx queries, just show all FedEx locations
     if (query.source === 'fedex' && !query.target) {
       console.log("Showing only FedEx locations with no filtering");
       const fedExLocations = addFedExLocations();
@@ -503,6 +469,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       return;
     }
     
+    // For queries relating to two different location types
     if (targetData) {
       console.log(`Finding ${query.source} locations within ${query.radius} miles of ${query.target} locations`);
       
@@ -536,6 +503,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       const sourceColors = getMarkerColors(query.source);
       const targetColors = query.target ? getMarkerColors(query.target) : { bg: '#333', border: '#fff' };
       
+      // Only add the locations that match our filter criteria
       addFilteredLocations(sourceLocations, query.source, sourceColors.bg, sourceColors.border);
       
       if (targetLocations.length > 0 && query.target) {
@@ -544,12 +512,14 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       
       addConnectionLines(connections);
       
+      // Fit the map to show only the matching locations
       fitMapToLocations([...sourceLocations, ...targetLocations].map(loc => {
         return Array.isArray(loc.coordinates) && loc.coordinates.length >= 2 
           ? [loc.coordinates[0], loc.coordinates[1]] as [number, number]
           : [0, 0] as [number, number];
       }));
       
+      // Only emit the filtered results
       emitResultsUpdate([...sourceLocations, ...targetLocations]);
       emitMapContextUpdate({
         visibleLocations: visibleLocationTypes,
@@ -604,7 +574,6 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     
     // Properties are always the main entity we're filtering
     const properties = INDUSTRIAL_PROPERTIES;
-    newVisibleTypes.push('property');
     
     // Display the include and exclude location markers
     const getMarkerColors = (locationType: string) => {
@@ -652,291 +621,4 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
     );
     
     // Display the filtered properties ONLY if there are any matching the criteria
-    if (filteredProperties.length > 0) {
-      addFilteredLocations(filteredProperties, 'property', '#333', '#fff');
-      newVisibleTypes.push('property');
-      
-      // Fit map to show all relevant markers
-      const allLocations = [...includeLocations, ...excludeLocations, ...filteredProperties];
-      fitMapToLocations(allLocations.map(loc => loc.coordinates as [number, number]));
-      
-      // Emit results update with ONLY the filtered properties
-      emitResultsUpdate(filteredProperties);
-      emitMapContextUpdate({
-        visibleLocations: newVisibleTypes,
-        query,
-        properties: filteredProperties
-      });
-    } else {
-      console.log("No properties match the complex criteria");
-      // Still fit the map to show the include/exclude locations
-      const locationPoints = [...includeLocations, ...excludeLocations];
-      fitMapToLocations(locationPoints.map(loc => loc.coordinates as [number, number]));
-      
-      emitResultsUpdate([]);
-      emitMapContextUpdate({
-        visibleLocations: newVisibleTypes,
-        query,
-        properties: []
-      });
-    }
-  };
-
-  const handleApiQuery = (event: CustomEvent<{query: string}>) => {
-    const { query } = event.detail;
-    console.log("API query received in Map component:", query);
-    
-    emitMapContextUpdate({
-      visibleLocations: visibleLocationTypes,
-      query: currentQuery || undefined,
-      properties: displayedProperties
-    });
-  };
-
-  const addFilteredLocations = (
-    locations: LocationWithCoordinates[],
-    locationType: string,
-    bgColor: string,
-    borderColor: string
-  ) => {
-    if (!map.current || !locations.length) {
-      console.error("Map not initialized or no locations when adding filtered locations");
-      return;
-    }
-    
-    const markers: mapboxgl.Marker[] = [];
-    
-    locations.forEach(location => {
-      let el: HTMLDivElement;
-      
-      if (locationType === 'fedex') {
-        el = document.createElement('div');
-        el.className = `${locationType}-marker-filtered`;
-        el.style.width = '32px';
-        el.style.height = '32px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = '#FFFFFF';
-        el.style.border = '2px solid #FF6600';
-        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
-        el.style.cursor = 'pointer';
-        el.style.display = 'flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        
-        // Updated FedEx logo SVG to match official logo
-        el.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 960 282" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M364 156H273V107H364V156Z" fill="#FF5900"/>
-            <path d="M364 229H273V180H364V229Z" fill="#FF5900"/>
-            <path d="M720 229H629V156H720V229Z" fill="#FF5900"/>
-            <path d="M720 107H629V34H720V107Z" fill="#FF5900"/>
-            <path d="M273 34H53V229H149V180H273V229H438V34H273V107H149V34H273Z" fill="#4D148C"/>
-            <path d="M546 229H438V34H537V83H485V132H537V180H485V229H546Z" fill="#4D148C"/>
-            <path d="M629 34V107H582L629 34Z" fill="#FF5900"/>
-            <path d="M798 229H720V34H798L845 107V34H906V229H845V156L798 229Z" fill="#FF5900"/>
-          </svg>
-        `;
-      } else if (locationType === 'starbucks') {
-        el = document.createElement('div');
-        el.className = `${locationType}-marker-filtered`;
-        el.style.width = '24px';
-        el.style.height = '24px';
-        el.style.borderRadius = '50%';
-        el.style.backgroundColor = bgColor;
-        el.style.border = `2px solid ${borderColor}`;
-        el.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.25)';
-        el.style.cursor = 'pointer';
-        
-        const iconContainer = document.createElement('div');
-        iconContainer.style.width = '100%';
-        iconContainer.style.height = '100%';
-        iconContainer.style.display = 'flex';
-        iconContainer.style.alignItems = 'center';
-        iconContainer.style.justifyContent = 'center';
-        iconContainer.innerHTML = `
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
-            <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
-            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
-            <line x1="6" y1="2" x2="6" y2="4"></line>
-            <line x1="10" y1="2" x2="10" y2="4"></line>
-            <line x1="14" y1="2" x2="14" y2="4"></line>
-          </svg>
-        `;
-        el.appendChild(iconContainer);
-      } else {
-        el = document.createElement('div');
-        el.className = `${locationType}-marker-filtered`;
-        el.style.width = '24px';
-        el.style.height = '34px';
-        el.style.backgroundImage = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 34' width='24' height='34'%3E%3Cpath fill='%23333' d='M12 0C5.383 0 0 5.383 0 12c0 5.79 10.192 20.208 11.34 21.674a.757.757 0 0 0 1.32 0C13.808 32.208 24 17.791 24 12c0-6.617-5.383-12-12-12z'%3E%3C/path%3E%3Ccircle fill='%23FFFFFF' cx='12' cy='12' r='8'%3E%3C/circle%3E%3C/svg%3E")`;
-        el.style.backgroundSize = 'contain';
-        el.style.backgroundRepeat = 'no-repeat';
-        el.style.cursor = 'pointer';
-        el.style.filter = 'drop-shadow(0 0 6px rgba(255,102,0,0.8))';
-      }
-      
-      const textColor = locationType === 'fedex' ? '#4D148C' : 
-                        locationType === 'starbucks' ? '#00704A' : '';
-      
-      const popup = new mapboxgl.Popup({ 
-        offset: locationType === 'property' ? [0, -15] : [0, 0],
-        closeButton: false,
-        closeOnClick: true
-      }).setHTML(`
-        <div style="padding: 8px; max-width: 200px;">
-          <h3 style="font-weight: bold; margin-bottom: 5px; ${ 
-            textColor ? `color: ${textColor};` : '' 
-          }">${location.name}</h3>
-          <p style="margin: 0;">${location.description}</p>
-        </div>
-      `);
-      
-      const marker = new mapboxgl.Marker({
-        element: el,
-        anchor: locationType === 'property' ? 'bottom' : 'center'
-      })
-        .setLngLat(Array.isArray(location.coordinates) && location.coordinates.length >= 2 
-          ? [location.coordinates[0], location.coordinates[1]] as [number, number]
-          : [0, 0] as [number, number])
-        .setPopup(popup)
-        .addTo(map.current);
-      
-      markers.push(marker);
-    });
-    
-    setActiveMarkers(prev => [...prev, ...markers]);
-    setDisplayedProperties(prev => [...prev, ...locations]);
-  };
-
-  const addConnectionLines = (
-    connections: Array<{ source: [number, number]; target: [number, number]; distance: number }>
-  ) => {
-    if (!map.current || !connections.length) {
-      console.error("Map not initialized or no connections when adding connection lines");
-      return;
-    }
-    
-    const layerIds = ['connections-layer', 'connections-labels'];
-    checkAndRemoveLayers(map.current, layerIds, 'connections');
-    
-    map.current.addSource('connections', {
-      type: 'geojson',
-      data: {
-        type: 'FeatureCollection',
-        features: connections.map((connection, index) => ({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [connection.source, connection.target]
-          },
-          properties: {
-            id: `connection-${index}`,
-            distance: connection.distance.toFixed(2)
-          }
-        }))
-      }
-    });
-    
-    map.current.addLayer({
-      id: 'connections-layer',
-      type: 'line',
-      source: 'connections',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round'
-      },
-      paint: {
-        'line-color': '#FF6600',
-        'line-width': 2,
-        'line-opacity': 0.7,
-        'line-dasharray': [2, 1]
-      }
-    });
-    
-    map.current.addLayer({
-      id: 'connections-labels',
-      type: 'symbol',
-      source: 'connections',
-      layout: {
-        'text-field': '{distance} mi',
-        'text-font': ['Open Sans Regular'],
-        'text-size': 12,
-        'text-offset': [0, 0.1],
-        'text-anchor': 'center',
-        'symbol-placement': 'line-center'
-      },
-      paint: {
-        'text-color': '#000',
-        'text-halo-color': '#fff',
-        'text-halo-width': 2
-      }
-    });
-    
-    setActiveLayers([...activeLayers, ...layerIds]);
-  };
-
-  const clearAllMarkers = () => {
-    console.log("Clearing all markers from map");
-    activeMarkers.forEach(marker => marker.remove());
-    setActiveMarkers([]);
-    setDisplayedProperties([]);
-  };
-  
-  const clearFilteredLocations = () => {
-    if (!map.current) return;
-    
-    console.log("Clearing filtered locations and connections");
-    activeLayers.forEach(layerId => {
-      if (map.current?.getLayer(layerId)) {
-        map.current.removeLayer(layerId);
-      }
-    });
-    
-    ['connections'].forEach(sourceId => {
-      if (map.current?.getSource(sourceId)) {
-        map.current.removeSource(sourceId);
-      }
-    });
-    
-    setActiveLayers([]);
-  };
-  
-  const fitMapToLocations = (coordinates: [number, number][]) => {
-    if (!map.current || !coordinates.length) return;
-    
-    const bounds = new mapboxgl.LngLatBounds();
-    
-    coordinates.forEach(coord => {
-      bounds.extend(coord);
-    });
-    
-    map.current.fitBounds(bounds, {
-      padding: { top: 50, bottom: 50, left: 50, right: 50 },
-      maxZoom: 15
-    });
-  };
-
-  useEffect(() => {
-    console.log("Setting up event listeners in Map component");
-    window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-    window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-    window.addEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
-    
-    return () => {
-      console.log("Removing event listeners from Map component");
-      window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery as EventListener);
-      window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery as EventListener);
-      window.removeEventListener(API_QUERY_EVENT, handleApiQuery as EventListener);
-    };
-  }, []);
-
-  return (
-    <div
-      ref={mapContainer}
-      className={`w-full h-full ${className}`}
-      style={{ borderRadius: '0.5rem' }}
-    />
-  );
-};
-
-export default Map;
+    if (filteredProperties.length >
