@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -80,6 +81,7 @@ export const MAP_RESULTS_UPDATE_EVENT = 'map-results-update';
 
 // Emit results update event
 export function emitResultsUpdate(properties: LocationWithCoordinates[]) {
+  console.log("Emitting map results update with properties:", properties.length);
   const event = new CustomEvent(MAP_RESULTS_UPDATE_EVENT, { 
     detail: { properties } 
   });

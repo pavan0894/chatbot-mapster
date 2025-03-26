@@ -21,6 +21,7 @@ export const LOCATION_QUERY_EVENT = 'location-query';
 
 // Emit a location query event
 export function emitLocationQuery(query: LocationQuery) {
+  console.log("Emitting location query:", query);
   const event = new CustomEvent(LOCATION_QUERY_EVENT, { detail: query });
   window.dispatchEvent(event);
 }
@@ -58,14 +59,24 @@ function isLocationQuery(message: string): LocationQuery | null {
   // Analyze for relationship queries
   if (hasFedEx && hasProperty) {
     // Determine if FedEx is the source or target
-    if (message.includes('fedex near') || message.includes('fedex close to') || 
-        message.includes('fedex within') || message.includes('fedex around')) {
+    if ((message.includes('fedex near') || message.includes('fedex close to') || 
+        message.includes('fedex within') || message.includes('fedex around')) && hasProperty) {
       return {
         source: 'fedex' as LocationSourceTarget,
         target: 'property' as LocationSourceTarget,
         radius
       };
+    } else if ((message.includes('property near') || message.includes('properties near') || 
+               message.includes('warehouse near') || message.includes('warehouses near') || 
+               message.includes('industrial near') || message.includes('properties close to') || 
+               message.includes('properties within') || message.includes('properties around')) && hasFedEx) {
+      return {
+        source: 'property' as LocationSourceTarget,
+        target: 'fedex' as LocationSourceTarget,
+        radius
+      };
     } else {
+      // Default relationship when both are mentioned but relationship is unclear
       return {
         source: 'property' as LocationSourceTarget,
         target: 'fedex' as LocationSourceTarget,
@@ -138,20 +149,21 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
 
     // Check if the message is a location query
     const locationQuery = isLocationQuery(input);
+    console.log("Location query detected:", locationQuery);
+
+    // Create a temporary processing message
+    const processingMessage: MessageType = {
+      id: `processing-${msgId}`,
+      text: locationQuery ? "Searching for locations..." : "Processing your request...",
+      sender: 'bot',
+      timestamp: new Date()
+    };
+    
+    setMessages(prevMessages => [...prevMessages, processingMessage]);
 
     if (locationQuery) {
       // Emit the location query event
       emitLocationQuery(locationQuery);
-      
-      // Create a temporary processing message
-      const processingMessage: MessageType = {
-        id: `processing-${msgId}`,
-        text: "Searching for locations...",
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      
-      setMessages(prevMessages => [...prevMessages, processingMessage]);
       
       // Convert messages to format expected by AI service
       const messageHistory: ChatMessageData[] = messages
@@ -218,7 +230,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         timestamp: new Date()
       };
       
-      setMessages(prevMessages => [...prevMessages, helpMessage]);
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === `processing-${msgId}` ? helpMessage : msg
+        )
+      );
     }
 
     // Clear input and reset processing state
