@@ -60,8 +60,13 @@ export function emitLocationQuery(query: LocationQuery) {
 
 export function emitComplexQueryEvent(query: LocationQuery) {
   console.log("Emitting complex query event:", query);
-  const event = new CustomEvent(COMPLEX_QUERY_EVENT, { detail: query });
+  const event = new CustomEvent(COMPLEX_QUERY_EVENT, { 
+    detail: query,
+    bubbles: true,
+    cancelable: true 
+  });
   window.dispatchEvent(event);
+  console.log("Complex query event dispatched");
 }
 
 export function emitMultiTargetQueryEvent(query: LocationQuery) {
@@ -638,27 +643,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ className = '' }) => {
         } else if (locationQuery.dynamicQuery) {
           emitDynamicQueryEvent(locationQuery);
         } else {
-          const event = new CustomEvent(LOCATION_QUERY_EVENT, { 
-            detail: locationQuery,
-            bubbles: true,
-            cancelable: true
-          });
-          
-          console.log("Created location query event:", event);
-          
-          window.dispatchEvent(event);
-          console.log("Location query event dispatched");
-          
-          setTimeout(() => {
-            console.log("Dispatching event again using emitLocationQuery helper");
-            emitLocationQuery(locationQuery);
-          }, 100);
-          
-          setTimeout(() => {
-            console.log("Final attempt: dispatching direct targeted event");
-            const finalEvent = verifyEventCreation(LOCATION_QUERY_EVENT, locationQuery);
-            window.dispatchEvent(finalEvent);
-          }, 200);
+          emitLocationQuery(locationQuery);
         }
       } else {
         if (input.includes("?") || 

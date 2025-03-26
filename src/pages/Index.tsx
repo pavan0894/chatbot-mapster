@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import Chatbot from "@/components/Chatbot";
 import Map, { DYNAMIC_QUERY_EVENT } from "@/components/Map";
 import { setupDebugEventListener } from '@/utils/debugUtils';
-import { LOCATION_QUERY_EVENT, API_QUERY_EVENT, COMPLEX_QUERY_EVENT } from '@/components/Chatbot';
+import { LOCATION_QUERY_EVENT, API_QUERY_EVENT, COMPLEX_QUERY_EVENT, MULTI_TARGET_QUERY_EVENT } from '@/components/Chatbot';
 
 const Index = () => {
   // Add debugging to track event handling
@@ -13,6 +13,7 @@ const Index = () => {
     setupDebugEventListener(LOCATION_QUERY_EVENT);
     setupDebugEventListener(API_QUERY_EVENT);
     setupDebugEventListener(COMPLEX_QUERY_EVENT);
+    setupDebugEventListener(MULTI_TARGET_QUERY_EVENT);
     setupDebugEventListener(DYNAMIC_QUERY_EVENT);
     
     const handleLocationQuery = (e: any) => {
@@ -23,8 +24,18 @@ const Index = () => {
       console.log("Index page received complex query event:", e.detail);
     };
     
+    const handleMultiTargetQuery = (e: any) => {
+      console.log("Index page received multi-target query event:", e.detail);
+    };
+    
+    const handleDynamicQuery = (e: any) => {
+      console.log("Index page received dynamic query event:", e.detail);
+    };
+    
     window.addEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
     window.addEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+    window.addEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+    window.addEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     
     // Enhanced global error handling for event-related issues
     window.addEventListener('error', (e) => {
@@ -34,6 +45,8 @@ const Index = () => {
     return () => {
       window.removeEventListener(LOCATION_QUERY_EVENT, handleLocationQuery);
       window.removeEventListener(COMPLEX_QUERY_EVENT, handleComplexQuery);
+      window.removeEventListener(MULTI_TARGET_QUERY_EVENT, handleMultiTargetQuery);
+      window.removeEventListener(DYNAMIC_QUERY_EVENT, handleDynamicQuery);
     };
   }, []);
 

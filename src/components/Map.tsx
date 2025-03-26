@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -15,7 +14,6 @@ import {
 } from '@/utils/mapUtils';
 import { STARBUCKS_LOCATIONS } from '@/data/starbucksLocations';
 
-// Define DYNAMIC_QUERY_EVENT since it's missing
 export const DYNAMIC_QUERY_EVENT = 'dynamic-query-event';
 
 const DEFAULT_MAPBOX_TOKEN = 'pk.eyJ1IjoicGF2YW4wODk0IiwiYSI6ImNtOG96eTFocTA1dXoyanBzcXhuYmY3b2kifQ.hxIlEcLal8KBl_1005RHeA';
@@ -328,11 +326,7 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
       iconContainer.style.justifyContent = 'center';
       iconContainer.innerHTML = `
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
-          <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
-          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
-          <line x1="6" y1="2" x2="6" y2="4"></line>
-          <line x1="10" y1="2" x2="10" y2="4"></line>
-          <line x1="14" y1="2" x2="14" y2="4"></line>
+          <path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"></path>
         </svg>
       `;
       el.appendChild(iconContainer);
@@ -883,10 +877,17 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
                 }
               });
               
-              // Convert map values to array
-              const starbucksLocsToShow: LocationWithCoordinates[] = Array.from(uniqueStarbucksLocationsMap.values());
-              if (starbucksLocsToShow.length > 0) {
-                addFilteredLocations(starbucksLocsToShow, 'starbucks', '#00704A', '#ffffff');
+              // Convert to array and add markers
+              const locationsToShow: LocationWithCoordinates[] = Array.from(uniqueStarbucksLocationsMap.values());
+              
+              if (locationsToShow.length > 0) {
+                addFilteredLocations(
+                  locationsToShow, 
+                  'starbucks',
+                  locationType === 'fedex' ? '#FF6600' : 
+                    locationType === 'starbucks' ? '#00704A' : '#3366cc',
+                  '#ffffff'
+                );
               }
             }
             
@@ -908,7 +909,11 @@ const Map: React.FC<MapProps> = ({ className = '' }) => {
             ];
             
             fitMapToLocations(allCoordinates);
-            emitResultsUpdate(resultProperties);
+            
+            // Emit results if the primary type is properties
+            if (query.source === 'property') {
+              emitResultsUpdate(resultProperties);
+            }
           } else {
             console.log("No properties found matching all criteria");
           }
